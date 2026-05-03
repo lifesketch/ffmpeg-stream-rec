@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HLS → MP4 запись</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="{% if active_recordings %}has-active-recording{% endif %}">
+  <header>
+    <h1>Запись HLS в MP4</h1>
+    <div id="recording-banner" class="recording-banner {% if active_recordings %}recording-banner--on{% endif %}" {% if not active_recordings %}hidden{% endif %}>
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span><strong>Идёт запись.</strong> <span class="recording-banner__count">Активных сессий: {{ active_recordings }}</span> · размер текущего файла обновляется каждые ~1.5 с</span>
+    </div>
+    <p class="muted">
+      Режим <strong>1</strong> — каталог сервера (по умолчанию).
+      <strong>2b</strong> — подпапка внутри корня записи (NAS).
+      <strong>2a</strong> — файл на сервере и возможность скачать копию на ПК через браузер (путь на ноутбук серверу не передаётся).
+    </p>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <ul class="flash">
+        {% for category, message in messages %}
+          <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+
+  <section>
+    <h2>Новая запись</h2>
+    <p class="muted">Активных независимых сессий не более {{ max_sessions }}.</p>
+    <form method="post" action="{{ url_for('main.record_start') }}" class="card">
+      <label>URL потока (.m3u8)<br>
+        <input type="url" name="url" required placeholder="https://…/index.m3u8">
+      </label>
+      <label>Базовое имя файла (латиница, без расширения; можно оставить по умолчанию)<br>
+        <input type="text" name="basename" value="{{ default_basename }}" maxlength="80" placeholder="steam1" autocomplete="off">
+      </label>
+      <label>Режим хранения<br>
+        <select name="storage_mode">
+          <option value="1" selected>1 — каталог сервера</option>
+          <option value="2">2b — подпапка (относительный путь)</option>
+          <option value="3">2a — сервер + скачивание в браузере</option>
+        </select>
+      </label>
+      <label>Подпапка (только для 2b)<br>
+        <input type="text" name="subpath" placeholder="nas/show1">
+      </label>
+      <div class="form-actions">
+        <button type="submit">Начать запись</button>
+        <button type="button" class="secondary" id="btn-history-open">История записи</button>
+      </div>
+      <p class="muted small">При нажатии «Начать запись» URL, имя файла и параметры сохраняются в историю с датой и временем.</p>
+      {% if active_recordings %}
+      <p class="muted small">
+        Сейчас идёт запись: значения в форме <strong>не переименовывают</strong> уже запущенную сессию в таблице ниже — они используются только при <strong>следующем</strong> нажатии «Начать запись».
+        Колонка «Часть» &gt; 1 у активной строки обычно значит <strong>автопродолжение</strong> после обрыва той же записи (то же базовое имя в БД).
+      </p>
+      {% endif %}
+    </form>
+  </section>
+
+  <section>
+    <h2>Сессии</h2>
+    {% if sessions_pager.total %}
+    <p class="muted small pager-meta">
+      Записи {{ sessions_pager.range_start }}–{{ sessions_pager.range_end }} из {{ sessions_pager.total }}
+      {% if sessions_pager.pages > 1 %}· стр. {{ sessions_pager.page }} из {{ sessions_pager.pages }}{% endif %}
+    </p>
+    {% endif %}
+    {% if sessions_rows %}
+      <div class="sessions-table-scroll">
+      <table class="sessions-table">
+        <thead>
+          <tr>
+            <th class="session-col-status">Статус</th>
+            <th class="session-col-start">Начало записи</th>
+            <th class="session-col-end">Окончание записи</th>
+            <th class="session-col-size">Размер на диске</th>
+            <th class="session-col-part">Часть</th>
+            <th class="session-col-pid">PID</th>
+            <th class="session-col-mode">Режим</th>
+            <th class="session-col-wrap session-col-name">Имя</th>
+            <th class="session-col-wrap session-col-path">Текущий файл</th>
+            <th class="session-col-wrap session-col-parts">Части (скачать)</th>
+            <th class="session-col-actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in sessions_rows %}
+            {% set s = row.session %}
+            {% set parts = row.parts %}
+            {% set lb = row.live_bytes %}
+            <tr data-session-id="{{ s.id }}" class="{% if s.status == 'recording' %}session-recording{% endif %}">
+              <td class="session-col-status">
+                <span class="rec-indicator" {% if s.status != 'recording' %}hidden{% endif %} aria-label="Идёт запись">
+                  <span class="rec-dot"></span> REC
+                </span>
+                <span class="status-text {% if s.status == 'recording' %}status-text--live{% endif %}">
+                  {% if s.status == 'recording' %}Запись{% else %}{{ s.status }}{% endif %}
+                </span>
+              </td>
+              <td class="session-col-start mono small">{{ s.created_at | fmt_dt }}</td>
+              <td class="session-col-end mono small ended-at-cell">{{ s.ended_at | fmt_dt }}</td>
+              <td class="session-col-size live-file-size mono small">
+                {% if s.status == 'recording' %}
+                  {% if lb < 1048576 %}
+                    {{ "%.1f"|format(lb / 1024) }} KB
+                  {% else %}
+                    {{ "%.2f"|format(lb / 1048576) }} MB
+                  {% endif %}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td class="session-col-part">{{ s.current_part }}</td>
+              <td class="session-col-pid mono small">{{ s.pid or '—' }}</td>
+              <td class="session-col-mode">{{ s.storage_mode }}{% if s.browser_download_hint %} · 2a{% endif %}</td>
+              <td class="session-col-wrap session-col-name">{{ s.basename }}</td>
+              <td class="session-col-wrap session-col-path mono small">{% if s.current_output_path %}{{ s.current_output_path }}{% else %}—{% endif %}</td>
+              <td class="session-col-wrap session-col-parts small">
+                {% for p in parts %}
+                  <a href="{{ url_for('main.files_download', rel_path=p) }}">{{ p }}</a>{% if not loop.last %}<br>{% endif %}
+                {% endfor %}
+                {% if s.browser_download_hint and parts %}
+                  <span class="muted">Сохраните файл через браузер (копия на ПК).</span>
+                {% endif %}
+              </td>
+              <td class="session-col-actions">
+                {% if s.status == 'recording' %}
+                  <form method="post" action="{{ url_for('main.record_stop', session_id=s.id) }}">
+                    <button type="submit" class="danger">Стоп</button>
+                  </form>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% if sessions_pager.pages > 1 %}
+      <nav class="pager" aria-label="Страницы списка сессий">
+        {% if sessions_pager.has_prev %}
+          <a href="{{ url_for('main.index', sessions_page=sessions_pager.page - 1, files_page=files_pager.page) }}">← Назад</a>
+        {% else %}
+          <span class="pager-disabled">← Назад</span>
+        {% endif %}
+        <span class="pager-pos">{{ sessions_pager.page }} / {{ sessions_pager.pages }}</span>
+        {% if sessions_pager.has_next %}
+          <a href="{{ url_for('main.index', sessions_page=sessions_pager.page + 1, files_page=files_pager.page) }}">Вперёд →</a>
+        {% else %}
+          <span class="pager-disabled">Вперёд →</span>
+        {% endif %}
+      </nav>
+      {% endif %}
+    {% else %}
+      <p class="muted">Пока нет сессий.</p>
+    {% endif %}
+    <p class="muted"><a href="{{ url_for('main.record_status') }}">JSON: статусы</a></p>
+  </section>
+
+  <section>
+    <h2>Файлы в каталоге записи</h2>
+    {% if files_pager.total %}
+    <p class="muted small pager-meta">
+      Файлы {{ files_pager.range_start }}–{{ files_pager.range_end }} из {{ files_pager.total }}
+      {% if files_pager.pages > 1 %}· стр. {{ files_pager.page }} из {{ files_pager.pages }}{% endif %}
+    </p>
+    {% endif %}
+    {% if files %}
+      <table>
+        <thead>
+          <tr>
+            <th>Файл</th>
+            <th>Скачать</th>
+            <th>Инфо</th>
+            <th>Проверка</th>
+            <th>Удалить</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rel in files %}
+            <tr>
+              <td class="mono small">{{ rel }}</td>
+              <td><a href="{{ url_for('main.files_download', rel_path=rel) }}">download</a></td>
+              <td><a href="{{ url_for('main.files_info', rel_path=rel) }}" target="_blank">ffprobe</a></td>
+              <td>
+                <form method="post" action="{{ url_for('main.files_check', rel_path=rel) }}">
+                  <button type="submit">ffmpeg -v error</button>
+                </form>
+              </td>
+              <td>
+                <form method="post" action="{{ url_for('main.files_delete') }}" onsubmit="return confirm('Удалить {{ rel }}?');">
+                  <input type="hidden" name="rel_path" value="{{ rel }}">
+                  <input type="hidden" name="confirm" value="yes">
+                  <button type="submit" class="danger">Удалить</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if files_pager.pages > 1 %}
+      <nav class="pager" aria-label="Страницы списка файлов">
+        {% if files_pager.has_prev %}
+          <a href="{{ url_for('main.index', sessions_page=sessions_pager.page, files_page=files_pager.page - 1) }}">← Назад</a>
+        {% else %}
+          <span class="pager-disabled">← Назад</span>
+        {% endif %}
+        <span class="pager-pos">{{ files_pager.page }} / {{ files_pager.pages }}</span>
+        {% if files_pager.has_next %}
+          <a href="{{ url_for('main.index', sessions_page=sessions_pager.page, files_page=files_pager.page + 1) }}">Вперёд →</a>
+        {% else %}
+          <span class="pager-disabled">Вперёд →</span>
+        {% endif %}
+      </nav>
+      {% endif %}
+    {% else %}
+      <p class="muted">Нет .mp4 файлов.</p>
+    {% endif %}
+  </section>
+
+  <dialog id="history-dialog" class="modal-history">
+    <div class="modal-history-inner">
+      <h3>История записи</h3>
+      <p class="muted small">Выберите строку. «Повторить запись» запускает новую сессию с тем же URL и параметрами. Удаление не влияет на уже записанные файлы.</p>
+      <p id="history-loading" class="muted">Загрузка…</p>
+      <div class="history-table-wrap">
+        <table class="history-table" id="history-table" hidden>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Дата и время</th>
+              <th>URL</th>
+              <th>Имя файла</th>
+              <th>Режим</th>
+              <th>Подпапка</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="modal-history-actions">
+        <button type="button" class="primary" id="history-repeat">Повторить запись</button>
+        <button type="button" class="danger" id="history-delete">Удалить выбранную</button>
+        <button type="button" class="secondary" id="history-close">Закрыть</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    window.LIVE_STATUS_URL = "{{ url_for('main.record_status') }}";
+    window.HISTORY_API_URL = "{{ url_for('main.recording_history_api') }}";
+    window.HISTORY_REPEAT_TMPL = "{{ url_for('main.recording_repeat', history_id='__HID__') }}";
+    window.HISTORY_DELETE_TMPL = "{{ url_for('main.recording_history_delete', history_id='__HID__') }}";
+  </script>
+  <script src="{{ url_for('static', filename='live-status.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='history-modal.js') }}" defer></script>
+</body>
+</html>

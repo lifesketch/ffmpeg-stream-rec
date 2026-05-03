@@ -1,0 +1,393 @@
+body {
+  font-family: system-ui, sans-serif;
+  margin: 1.5rem auto;
+  max-width: 960px;
+  line-height: 1.45;
+  color: #1a1a1a;
+}
+
+header h1 {
+  margin-bottom: 0.25rem;
+}
+
+.muted {
+  color: #555;
+  font-size: 0.92rem;
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+label {
+  display: block;
+}
+
+input[type="url"],
+input[type="text"],
+select {
+  width: 100%;
+  max-width: 36rem;
+  padding: 0.35rem 0.5rem;
+  margin-top: 0.25rem;
+}
+
+button {
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+}
+
+button.danger {
+  background: #c62828;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+}
+
+button.secondary {
+  background: #eceff1;
+  color: #263238;
+  border: 1px solid #cfd8dc;
+  border-radius: 4px;
+}
+
+button.primary {
+  background: #1565c0;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.modal-history {
+  border: none;
+  border-radius: 10px;
+  padding: 0;
+  max-width: 96vw;
+  width: min(920px, 96vw);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.modal-history::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.modal-history-inner {
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.modal-history-inner h3 {
+  margin-top: 0;
+}
+
+.modal-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.history-table-wrap {
+  max-height: min(50vh, 420px);
+  overflow: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.history-table th,
+.history-table td {
+  border-bottom: 1px solid #eee;
+  padding: 0.35rem 0.45rem;
+  vertical-align: top;
+}
+
+.history-table th {
+  background: #f5f5f5;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.history-url {
+  word-break: break-all;
+  max-width: 280px;
+}
+
+section {
+  margin-top: 2rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+th,
+td {
+  border: 1px solid #e0e0e0;
+  padding: 0.4rem 0.5rem;
+  vertical-align: top;
+}
+
+th {
+  background: #f0f0f0;
+  text-align: left;
+}
+
+.flash {
+  list-style: none;
+  padding: 0;
+}
+
+.flash li {
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.35rem;
+  border-radius: 4px;
+}
+
+.flash .success {
+  background: #e8f5e9;
+}
+
+.flash .error {
+  background: #ffebee;
+}
+
+/* Индикация активной записи */
+.recording-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 1rem;
+  border-radius: 6px;
+  border: 1px solid #ffcdd2;
+  background: #fff8f8;
+  font-size: 0.95rem;
+}
+
+.recording-banner[hidden] {
+  display: none !important;
+}
+
+.recording-banner--on {
+  border-color: #e53935;
+  background: #ffebee;
+}
+
+.rec-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #c62828;
+  animation: rec-pulse 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes rec-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(198, 40, 40, 0.5);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.05);
+    box-shadow: 0 0 0 6px rgba(198, 40, 40, 0);
+  }
+}
+
+.rec-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  color: #b71c1c;
+  font-size: 0.88rem;
+  letter-spacing: 0.02em;
+}
+
+.rec-indicator[hidden] {
+  display: none !important;
+}
+
+.status-text--live {
+  color: #b71c1c;
+  font-weight: 600;
+}
+
+tr.session-recording {
+  background: #fff5f5;
+}
+
+.sessions-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  margin-bottom: 0.25rem;
+  padding-inline-end: 0.35rem;
+  box-sizing: border-box;
+}
+
+.sessions-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 54rem;
+}
+
+/* Доли колонок в сумме 100%; min-width — чтобы первые колонки не сжимались в «кашу» */
+.sessions-table .session-col-status {
+  width: 8%;
+  min-width: 6.25rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.sessions-table .session-col-start,
+.sessions-table .session-col-end {
+  width: 10%;
+  min-width: 10.25rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.sessions-table .session-col-size {
+  width: 7%;
+  min-width: 5rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Перекрывает глобальный .live-file-size { nowrap } для этой таблицы */
+.sessions-table td.session-col-size.live-file-size {
+  white-space: normal;
+}
+
+.sessions-table .session-col-part {
+  width: 4%;
+  min-width: 3rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.sessions-table .session-col-pid {
+  width: 5%;
+  min-width: 4rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.sessions-table .session-col-mode {
+  width: 5%;
+  min-width: 3.25rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.sessions-table .session-col-wrap {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.sessions-table .session-col-name {
+  width: 13%;
+  min-width: 7rem;
+}
+
+.sessions-table .session-col-path {
+  width: 15%;
+  min-width: 8rem;
+}
+
+.sessions-table .session-col-parts {
+  width: 16%;
+  min-width: 8rem;
+}
+
+.sessions-table .session-col-parts a {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.sessions-table .session-col-actions {
+  width: 7%;
+  min-width: 6.75rem;
+  white-space: nowrap;
+  padding-inline-start: 0.35rem;
+  padding-inline-end: 0.5rem;
+  vertical-align: middle;
+}
+
+.sessions-table .session-col-actions form {
+  margin: 0;
+}
+
+.sessions-table .session-col-actions button.danger {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.live-file-size {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pager-meta {
+  margin-bottom: 0.35rem;
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+  font-size: 0.92rem;
+}
+
+.pager a {
+  color: #1565c0;
+  text-decoration: none;
+}
+
+.pager a:hover {
+  text-decoration: underline;
+}
+
+.pager-pos {
+  font-variant-numeric: tabular-nums;
+  color: #444;
+}
+
+.pager-disabled {
+  color: #bbb;
+  cursor: default;
+}

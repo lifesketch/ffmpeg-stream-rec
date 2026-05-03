@@ -1,6 +1,7 @@
 .venv/
 venv/
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *$py.class
 .Python
@@ -10,3 +11,7 @@ __pycache__/
 *.log
 .DS_Store
 ffmpeg_table.xlsx
+recordings/
+logs/
+data/
+.ipynb_checkpoints/

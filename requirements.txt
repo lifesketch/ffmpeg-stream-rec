@@ -1,0 +1,5 @@
+Flask>=3.0,<4
+python-dotenv>=1.0,<2
+psutil>=5.9,<7
+Werkzeug>=3.0,<4
+ipykernel>=6.29,<7
