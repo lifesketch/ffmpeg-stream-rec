@@ -42,7 +42,33 @@ python -m recorder
 
 Открой в браузере: http://127.0.0.1:5000
 
-Порт и хост можно задать переменными окружения `FLASK_RUN_HOST`, `FLASK_RUN_PORT` или через фабрику приложения.
+Порт и хост задаются переменными **`FLASK_RUN_HOST`** и **`FLASK_RUN_PORT`** (см. `recorder/__main__.py`). Если **5000 уже занят** (часто бывает на macOS из‑за AirPlay Receiver или другого сервиса), запусти на другом порту:
+
+```bash
+FLASK_RUN_PORT=8080 python -m recorder
+```
+
+Тогда адрес будет http://127.0.0.1:8080 .
+
+**Docker (кратко):** внутри контейнера по умолчанию порт **5000**; на хосте пробрасывается любой свободный (см. раздел [Docker](#docker) и переменную **`HOST_PORT`**). Подробнее — ниже.
+
+## Docker
+
+Локальный запуск **`python -m recorder`** из venv **не требует Docker и не меняется**.
+
+Образ и `docker-compose.yml` — отдельный способ развёртывания (в т.ч. Synology). В compose для контейнера заданы пути **`/data/recordings`**, **`/data/state.sqlite3`**, **`/data/logs`** и один том, чтобы записи и SQLite переживали пересоздание контейнера.
+
+```bash
+cp .env.example .env   # SECRET_KEY обязателен; см. комментарии про HOST_PORT
+docker compose build
+docker compose up -d
+```
+
+- Интерфейс по умолчанию: **http://127.0.0.1:8080** (`HOST_PORT` из `.env` или значение по умолчанию в `docker-compose.yml`).
+- Если порт на машине занят — выставьте в `.env`, например: **`HOST_PORT=9000`**.
+- На NAS имеет смысл заменить именованный том на **bind-mount** к каталогам на диске (записи + каталог с SQLite).
+
+Остановка без удаления данных: `docker compose down`. Для доступа из сети задайте **`RECORDING_AUTH_TOKEN`** в `.env`.
 
 ## Jupyter Notebook
 
@@ -70,6 +96,8 @@ python -m ipykernel install --user --name=ffmpeg-stream-rec --display-name="Pyth
 
 | Переменная | Назначение |
 |------------|------------|
+| `FLASK_RUN_HOST` | Адрес при `python -m recorder` (по умолчанию `127.0.0.1`; в Docker обычно `0.0.0.0`) |
+| `FLASK_RUN_PORT` | Порт при `python -m recorder` (по умолчанию `5000`; см. занятый порт выше) |
 | `RECORDINGS_ROOT` | Корень сохранения файлов (режим 1 и базовый путь для 2b) |
 | `STATE_DB_PATH` | SQLite для состояния сессий |
 | `MAX_INDEPENDENT_SESSIONS` | Лимит параллельных независимых записей (по умолчанию 2) |

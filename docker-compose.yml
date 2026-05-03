@@ -1,0 +1,21 @@
+# Локальная разработка по-прежнему: python -m recorder из venv.
+# Здесь только сценарий Docker: пути и хост переопределены под контейнер.
+
+services:
+  recorder:
+    build: .
+    ports:
+      - "${HOST_PORT:-8080}:5000"
+    environment:
+      FLASK_RUN_HOST: "0.0.0.0"
+      FLASK_RUN_PORT: "5000"
+      RECORDINGS_ROOT: /data/recordings
+      STATE_DB_PATH: /data/state.sqlite3
+      LOG_DIR: /data/logs
+    env_file:
+      - .env
+    volumes:
+      - recorder-data:/data
+
+volumes:
+  recorder-data:
