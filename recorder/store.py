@@ -138,8 +138,9 @@ class SessionStore:
         status: str,
         pid: int | None,
         current_output_path: str | None,
+        session_id: str | None = None,
     ) -> str:
-        sid = str(uuid.uuid4())
+        sid = session_id if session_id is not None else str(uuid.uuid4())
         now = _utc_now()
         with self._lock, self._connect() as conn:
             conn.execute(

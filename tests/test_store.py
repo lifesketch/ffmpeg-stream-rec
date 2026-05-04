@@ -42,6 +42,13 @@ def test_create_and_get(store):
     assert row.status == "stopped"
 
 
+def test_create_session_explicit_id(store):
+    fixed = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    sid = store.create_session(session_id=fixed, **_mk_session_kwargs())
+    assert sid == fixed
+    assert store.get(fixed) is not None
+
+
 def test_count_recording(store):
     assert store.count_recording() == 0
     store.create_session(**_mk_session_kwargs(status="recording", pid=12345))
