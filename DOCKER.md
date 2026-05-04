@@ -2,11 +2,13 @@
 
 Все команды выполняй из каталога, где лежит **`docker-compose.yml`** (корень проекта).
 
-На Synology, если без `sudo` ошибка `permission denied` к Docker — везде добавь **`sudo`** перед `docker`.
+**Synology / нет доступа к сокету Docker без root:** используй **`sudo`** у **каждой** команды `docker` и `docker compose` (ниже есть готовые блоки). Если в одном месте забудешь `sudo`, compose может подключиться к «чужому» контексту или выдать `permission denied`.
 
 ---
 
 ## Первый запуск
+
+**Linux / Mac (пользователь в группе `docker`):**
 
 ```bash
 cd /path/to/ffmpeg-stream-rec
@@ -17,6 +19,19 @@ mkdir -p docker-data
 
 docker compose build
 docker compose up -d
+```
+
+**Synology (SSH), тот же сценарий с `sudo`:**
+
+```bash
+cd /volume1/docker/ffmpeg-stream-rec-feature-docker
+cp .env.example .env
+# SECRET_KEY, при необходимости HOST_PORT
+
+sudo mkdir -p docker-data
+
+sudo docker compose build
+sudo docker compose up -d
 ```
 
 ---
@@ -30,11 +45,27 @@ docker compose build
 docker compose up -d
 ```
 
+**С `sudo` (NAS):**
+
+```bash
+cd /volume1/docker/ffmpeg-stream-rec-feature-docker
+sudo docker compose down
+sudo docker compose build
+sudo docker compose up -d
+```
+
 Пересборка без кэша (если подозреваешь залипший слой образа):
 
 ```bash
 docker compose build --no-cache
 docker compose up -d
+```
+
+**С `sudo`:**
+
+```bash
+sudo docker compose build --no-cache
+sudo docker compose up -d
 ```
 
 ---
@@ -63,6 +94,10 @@ sudo docker compose logs -f recorder
 
 ```bash
 docker compose down
+```
+
+```bash
+sudo docker compose down
 ```
 
 ---
@@ -98,6 +133,13 @@ docker compose exec recorder ls -la /data/recordings
 docker compose exec recorder ffmpeg -hide_banner -loglevel info -i "https://ПОДСТАВЬ_URL/index.m3u8" -t 15 -c copy -f null -
 ```
 
+**С `sudo`:**
+
+```bash
+sudo docker compose exec recorder ls -la /data/recordings
+sudo docker compose exec recorder ffmpeg -hide_banner -loglevel info -i "https://ПОДСТАВЬ_URL/index.m3u8" -t 15 -c copy -f null -
+```
+
 ---
 
 ## Локальные тесты (без Docker, нужен venv)
@@ -120,3 +162,9 @@ pytest
 | `docker-data/logs/`       | `/data/logs/` |
 
 Переменные **`RECORDINGS_ROOT` / `STATE_DB_PATH` / `LOG_DIR`** в `.env` для Docker **не задают** эти пути — их фиксирует **`docker-compose.yml`**.
+
+---
+
+## Автопроверка в репозитории
+
+В GitHub на push/PR workflow **Docker build** выполняет `docker compose config` и **`docker compose build`**. Зелёная галочка = образ на чистой Ubuntu собирается; это **не** проверяет твой NAS и **не** проверяет реальный HLS-поток.

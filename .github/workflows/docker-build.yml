@@ -1,0 +1,22 @@
+# Проверка, что Dockerfile и compose собираются (на каждом push / PR).
+# Это не заменяет ручной тест записи HLS на твоём NAS.
+
+name: Docker build
+
+on:
+  push:
+    branches: [main, develop, "feature/**"]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  compose-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate compose file
+        run: docker compose config --quiet
+
+      - name: Build image
+        run: docker compose build
