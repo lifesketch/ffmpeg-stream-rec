@@ -35,7 +35,7 @@
     <p class="muted">Активных независимых сессий не более {{ max_sessions }}.</p>
     <form method="post" action="{{ url_for('main.record_start') }}" class="card">
       <label>URL потока (.m3u8)<br>
-        <input type="url" name="url" required placeholder="https://…/index.m3u8">
+        <input type="text" name="url" required placeholder="https://…/index.m3u8" spellcheck="false" autocomplete="off" class="mono">
       </label>
       <label>Базовое имя файла (латиница, без расширения; можно оставить по умолчанию)<br>
         <input type="text" name="basename" value="{{ default_basename }}" maxlength="80" placeholder="steam1" autocomplete="off">

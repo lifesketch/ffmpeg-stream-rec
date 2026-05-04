@@ -15,6 +15,11 @@ def test_validate_stream_url_ok():
     )
 
 
+def test_validate_stream_url_strips_invisible_copy_paste():
+    raw = "\ufeffhttps://example.com/a.m3u8\u200b"
+    assert paths_util.validate_stream_url(raw) == "https://example.com/a.m3u8"
+
+
 @pytest.mark.parametrize(
     "bad",
     ["", "ftp://x", "/local/path.m3u8", "example.com/x.m3u8"],

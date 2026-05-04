@@ -8,8 +8,16 @@ _URL_PREFIXES = ("http://", "https://")
 _BASENAME_RE = re.compile(r"^[a-zA-Z0-9_-]{1,80}$")
 
 
-def validate_stream_url(url: str) -> str:
+def normalize_stream_url_input(url: str) -> str:
+    """Убрать пробелы по краям и невидимые символы копипаста (BOM, zero-width, NBSP)."""
     u = (url or "").strip()
+    for ch in ("\ufeff", "\u200b", "\u200c", "\u200d", "\xa0"):
+        u = u.replace(ch, "")
+    return u.strip()
+
+
+def validate_stream_url(url: str) -> str:
+    u = normalize_stream_url_input(url)
     if not u.startswith(_URL_PREFIXES):
         raise ValueError("URL должен начинаться с http:// или https://")
     return u
