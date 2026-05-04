@@ -12,6 +12,7 @@ __pycache__
 recordings/
 data/
 logs/
+docker-data/
 notebooks/
 tests/
 docs/

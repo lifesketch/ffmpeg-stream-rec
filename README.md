@@ -56,19 +56,25 @@ FLASK_RUN_PORT=8080 python -m recorder
 
 Локальный запуск **`python -m recorder`** из venv **не требует Docker и не меняется**.
 
-Образ и `docker-compose.yml` — отдельный способ развёртывания (в т.ч. Synology). В compose для контейнера заданы пути **`/data/recordings`**, **`/data/state.sqlite3`**, **`/data/logs`** и один том, чтобы записи и SQLite переживали пересоздание контейнера.
+Образ и `docker-compose.yml` — развёртывание в том числе на Synology. Данные на **хосте** лежат в каталоге **`docker-data/`** в корне проекта (bind-mount на `/data` в контейнере):
+
+- **`docker-data/recordings/`** — MP4;
+- **`docker-data/state.sqlite3`** — сессии;
+- **`docker-data/logs/`** — логи приложения.
+
+Папки создаются при первом `docker compose up`. Скопируйте на NAS весь проект (или архив) — достаточно вместе с **`docker-data/`**, если нужны уже записанные файлы. Если раньше стоял **именованный том** `recorder-data`, старые MP4 остались внутри тома Docker (`docker volume inspect …`); при необходимости перенесите их в **`docker-data/recordings/`** на хосте.
 
 ```bash
-cp .env.example .env   # SECRET_KEY обязателен; см. комментарии про HOST_PORT
+cp .env.example .env   # SECRET_KEY обязателен; см. комментарии про HOST_PORT и Docker
 docker compose build
 docker compose up -d
 ```
 
-- Интерфейс по умолчанию: **http://127.0.0.1:8080** (`HOST_PORT` из `.env` или значение по умолчанию в `docker-compose.yml`).
-- Если порт на машине занят — выставьте в `.env`, например: **`HOST_PORT=9000`**.
-- На NAS имеет смысл заменить именованный том на **bind-mount** к каталогам на диске (записи + каталог с SQLite).
+- Интерфейс по умолчанию: **http://127.0.0.1:8080** (`HOST_PORT` в `.env` или значение по умолчанию в compose).
+- Если порт занят — в `.env`: **`HOST_PORT=9000`**.
+- Переменные **`RECORDINGS_ROOT`**, **`STATE_DB_PATH`**, **`LOG_DIR`** из `.env` в контейнере **переопределяются** compose (см. `environment` в `docker-compose.yml`); в `.env` они нужны для локального запуска без Docker.
 
-Остановка без удаления данных: `docker compose down`. Для доступа из сети задайте **`RECORDING_AUTH_TOKEN`** в `.env`.
+Остановка контейнера **без** удаления записей: `docker compose down`. Каталог **`docker-data/`** на диске остаётся. Для доступа из сети задайте **`RECORDING_AUTH_TOKEN`** в `.env`.
 
 ## Jupyter Notebook
 
@@ -98,8 +104,10 @@ python -m ipykernel install --user --name=ffmpeg-stream-rec --display-name="Pyth
 |------------|------------|
 | `FLASK_RUN_HOST` | Адрес при `python -m recorder` (по умолчанию `127.0.0.1`; в Docker обычно `0.0.0.0`) |
 | `FLASK_RUN_PORT` | Порт при `python -m recorder` (по умолчанию `5000`; см. занятый порт выше) |
-| `RECORDINGS_ROOT` | Корень сохранения файлов (режим 1 и базовый путь для 2b) |
-| `STATE_DB_PATH` | SQLite для состояния сессий |
+| `HOST_PORT` | Только Docker Compose: порт на хосте для проброса на `5000` внутри контейнера (по умолчанию `8080` в `docker-compose.yml`) |
+| `RECORDINGS_ROOT` | Корень сохранения файлов при **локальном** запуске; в Docker задаётся в compose (`/data/recordings` → `docker-data/recordings/`) |
+| `STATE_DB_PATH` | SQLite для состояния сессий (локально); в Docker — **`docker-data/state.sqlite3`** |
+| `LOG_DIR` | Каталог логов при локальном запуске; в Docker — **`docker-data/logs/`** |
 | `MAX_INDEPENDENT_SESSIONS` | Лимит параллельных независимых записей (по умолчанию 2) |
 | `MAX_CONTINUATIONS` | Лимит авто‑продолжений после аварии (по умолчанию 5) |
 | `DEFAULT_RECORDING_BASENAME` | Подставляется в форму и в поле, если оставить пустым (по умолчанию `steam1`) |

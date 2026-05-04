@@ -133,16 +133,32 @@ def output_mp4_path(
     return out
 
 
-def resolve_existing_mp4(recordings_root: Path, rel_path: str) -> Path:
-    """Путь к уже существующему mp4 относительно RECORDINGS_ROOT."""
+def resolve_mp4_under_recordings_root(recordings_root: Path, rel_path: str) -> Path:
+    """
+    Безопасный путь к .mp4 внутри RECORDINGS_ROOT.
+    rel_path — как в БД (относительный), либо абсолютный путь уже под тем же корнем
+    (копии БД / ручные правки), чтобы не получить «двойной» корень после lstrip('/').
+    """
     root = recordings_root.resolve()
-    raw = (rel_path or "").strip().replace("\\", "/").lstrip("/")
-    if not raw or ".." in raw.split("/"):
+    raw_in = (rel_path or "").strip().replace("\\", "/")
+    if not raw_in:
         raise ValueError("Некорректный путь")
-    candidate = (root / raw).resolve()
+    p_in = Path(raw_in)
+    if ".." in p_in.parts:
+        raise ValueError("Некорректный путь")
+    if p_in.is_absolute():
+        candidate = p_in.resolve()
+    else:
+        candidate = (root / raw_in.lstrip("/")).resolve()
     candidate.relative_to(root)
     if candidate.suffix.lower() != ".mp4":
         raise ValueError("Ожидался .mp4")
+    return candidate
+
+
+def resolve_existing_mp4(recordings_root: Path, rel_path: str) -> Path:
+    """Путь к уже существующему mp4 относительно RECORDINGS_ROOT."""
+    candidate = resolve_mp4_under_recordings_root(recordings_root, rel_path)
     if not candidate.is_file():
         raise FileNotFoundError("Файл не найден")
     return candidate

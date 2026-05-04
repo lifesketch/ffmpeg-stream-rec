@@ -5,6 +5,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 .Python
+# Локальные секреты (например SECRET_KEY); шаблон — только .env.example
 .env
 .env.*
 !.env.example
@@ -14,4 +15,5 @@ ffmpeg_table.xlsx
 recordings/
 logs/
 data/
+docker-data/
 .ipynb_checkpoints/

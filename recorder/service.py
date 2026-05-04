@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import json
+import os
+import stat
 import subprocess
+import sys
 import threading
 import time
 from datetime import datetime, timezone
@@ -357,18 +360,65 @@ class RecordingService:
     def list_sessions(self) -> list[SessionRow]:
         return self._store.list_all()
 
+    def _live_bytes_via_proc_fd(self, pid: int, expected_name: str) -> int | None:
+        """
+        В Docker/NAS иногда путь из БД и реальный выход FFmpeg расходятся; по открытым fd
+        процесса находим файл с ожидаемым именем под RECORDINGS_ROOT.
+        Только Linux (/proc).
+        """
+        if sys.platform != "linux" or pid <= 0:
+            return None
+        root = self.recordings_root.resolve()
+        fd_dir = Path(f"/proc/{pid}/fd")
+        try:
+            if not fd_dir.is_dir():
+                return None
+        except OSError:
+            return None
+        for item in fd_dir.iterdir():
+            if not item.name.isdigit():
+                continue
+            try:
+                target = os.readlink(item)
+            except OSError:
+                continue
+            try:
+                cand = Path(target).resolve()
+                if cand.name != expected_name:
+                    continue
+                cand.relative_to(root)
+            except (ValueError, OSError):
+                continue
+            try:
+                st = cand.stat()
+                if not stat.S_ISREG(st.st_mode):
+                    continue
+                return int(st.st_size)
+            except OSError:
+                continue
+        return None
+
     def current_recording_file_bytes(self, session_id: str) -> int:
         """Размер текущего выходного .mp4 в байтах (0 если не идёт запись или файла ещё нет)."""
         row = self._store.get(session_id)
         if not row or row.status != "recording" or not row.current_output_path:
             return 0
+        expected_name = f"{row.basename}_{row.current_part:03d}.mp4"
         try:
-            p = paths_util.resolve_existing_mp4(
+            p = paths_util.resolve_mp4_under_recordings_root(
                 self.recordings_root, row.current_output_path
             )
-            return int(p.stat().st_size)
+            if p.is_file():
+                return int(p.stat().st_size)
         except (OSError, ValueError, FileNotFoundError):
-            return 0
+            pass
+
+        if row.pid:
+            via_proc = self._live_bytes_via_proc_fd(int(row.pid), expected_name)
+            if via_proc is not None:
+                return via_proc
+
+        return 0
 
     def completed_parts(self, session_id: str) -> list[str]:
         row = self._store.get(session_id)

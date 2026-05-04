@@ -1,5 +1,12 @@
-# Локальная разработка по-прежнему: python -m recorder из venv.
-# Здесь только сценарий Docker: пути и хост переопределены под контейнер.
+# Локальная разработка: python -m recorder из venv (без Docker).
+#
+# Docker: данные на хосте в ./docker-data/ (удобно копировать проект + папку на NAS):
+#   docker-data/recordings/  — MP4
+#   docker-data/state.sqlite3
+#   docker-data/logs/
+#
+# Пути внутри контейнера фиксированы; переменные RECORDINGS_ROOT / STATE_DB_PATH / LOG_DIR
+# из .env для этого сервиса не используются (их переопределяет блок environment ниже).
 
 services:
   recorder:
@@ -15,7 +22,4 @@ services:
     env_file:
       - .env
     volumes:
-      - recorder-data:/data
-
-volumes:
-  recorder-data:
+      - ./docker-data:/data

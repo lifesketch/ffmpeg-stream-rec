@@ -3,7 +3,7 @@
   if (!url) return;
 
   function fmtSize(bytes) {
-    if (bytes == null || bytes === 0) return "0.00 MB";
+    if (bytes == null || bytes === 0) return "0.0 KB";
     var mb = bytes / (1024 * 1024);
     if (mb < 0.01) return (bytes / 1024).toFixed(1) + " KB";
     return mb.toFixed(2) + " MB";

@@ -82,6 +82,16 @@ def test_allocate_unique_starting_part_mode_2b(tmp_path):
     assert paths_util.allocate_unique_starting_part(root, 2, sub, "show") == 2
 
 
+def test_resolve_mp4_under_recordings_root_absolute(tmp_path):
+    root = tmp_path / "rec"
+    root.mkdir()
+    f = root / "a_001.mp4"
+    f.write_bytes(b"ab")
+    abs_str = str(f.resolve())
+    cand = paths_util.resolve_mp4_under_recordings_root(root, abs_str)
+    assert cand.resolve() == f.resolve()
+
+
 def test_resolve_existing_mp4(tmp_path):
     root = tmp_path / "rec"
     root.mkdir()
