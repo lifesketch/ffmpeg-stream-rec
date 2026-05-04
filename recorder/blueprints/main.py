@@ -39,6 +39,15 @@ def format_iso_local(iso_str: str | None) -> str:
         return iso_str
 
 
+def _file_saved_at_local(path: Path) -> str:
+    """Дата и время последней модификации файла на диске (локальная зона)."""
+    try:
+        ts = path.stat().st_mtime
+    except OSError:
+        return "—"
+    return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S")
+
+
 @bp.before_request
 def _optional_bearer_auth() -> None:
     token = (current_app.config.get("AUTH_TOKEN") or "").strip()
@@ -62,7 +71,15 @@ def _list_mp4_files(root: Path) -> list[Path]:
             continue
         if p.is_file():
             out.append(p)
-    return sorted(out)
+
+    def _mtime_key(pp: Path) -> float:
+        try:
+            return pp.stat().st_mtime
+        except OSError:
+            return 0.0
+
+    out.sort(key=_mtime_key, reverse=True)
+    return out
 
 
 def _safe_page_arg(name: str) -> int:
@@ -106,20 +123,24 @@ def index():
         sessions_rows.append(
             {"session": s, "parts": parts, "live_bytes": live_bytes}
         )
-    files = _list_mp4_files(svc.recordings_root)
-    rel_files = [
-        paths_util.relative_to_recordings(svc.recordings_root, f) for f in files
+    mp4_paths = _list_mp4_files(svc.recordings_root)
+    files = [
+        {
+            "rel": paths_util.relative_to_recordings(svc.recordings_root, p),
+            "saved_at": _file_saved_at_local(p),
+        }
+        for p in mp4_paths
     ]
     sp = _safe_page_arg("sessions_page")
     fp = _safe_page_arg("files_page")
     sessions_rows, sessions_pager = _paginate(sessions_rows, sp, INDEX_PAGE_SIZE)
-    rel_files, files_pager = _paginate(rel_files, fp, INDEX_PAGE_SIZE)
+    files, files_pager = _paginate(files, fp, INDEX_PAGE_SIZE)
     return render_template(
         "index.html",
         sessions_rows=sessions_rows,
         sessions_pager=sessions_pager,
         active_recordings=active_recordings,
-        files=rel_files,
+        files=files,
         files_pager=files_pager,
         max_sessions=current_app.config["MAX_INDEPENDENT_SESSIONS"],
         default_basename=current_app.config["DEFAULT_RECORDING_BASENAME"],

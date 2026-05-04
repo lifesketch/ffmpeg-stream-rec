@@ -45,7 +45,11 @@
               stLabel.textContent = s.status;
               stLabel.classList.remove("status-text--live");
             }
-            if (sz) sz.textContent = "—";
+            if (sz) {
+              var doneBytes =
+                s.current_file_bytes != null ? s.current_file_bytes : 0;
+              sz.textContent = doneBytes > 0 ? fmtSize(doneBytes) : "—";
+            }
             if (endCell)
               endCell.textContent =
                 s.ended_at_local || (s.ended_at ? s.ended_at : "—");

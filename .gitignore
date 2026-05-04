@@ -17,3 +17,4 @@ logs/
 data/
 docker-data/
 .ipynb_checkpoints/
+notebooks/.dev_server_state.json

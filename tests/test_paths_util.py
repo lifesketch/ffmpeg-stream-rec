@@ -79,6 +79,15 @@ def test_allocate_unique_starting_part(tmp_path):
     assert paths_util.allocate_unique_starting_part(root, mode, sub, "x") == 2
 
 
+def test_allocate_unique_reuses_part_if_file_is_zero_bytes(tmp_path):
+    root = tmp_path / "rec"
+    root.mkdir()
+    p1 = paths_util.output_mp4_path(root, 1, None, "y", 1)
+    p1.write_bytes(b"")
+    assert paths_util.allocate_unique_starting_part(root, 1, None, "y") == 1
+    assert not p1.is_file()
+
+
 def test_allocate_unique_starting_part_mode_2b(tmp_path):
     root = tmp_path / "rec"
     root.mkdir()

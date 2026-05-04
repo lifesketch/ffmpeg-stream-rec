@@ -16,6 +16,9 @@ def test_build_record_args_contains_io(tmp_path):
     assert "-c" in args and "copy" in args
     assert "-nostats" in args
     assert "-loglevel" in args and "warning" in args
+    assert "-flush_packets" in args
+    assert "-movflags" in args
+    assert any("frag_keyframe" in str(a) for a in args)
 
 
 def test_build_integrity_check_args(tmp_path):

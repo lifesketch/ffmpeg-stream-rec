@@ -24,6 +24,12 @@ def build_record_args(
         "copy",
         "-bsf:a",
         "aac_adtstoasc",
+        # Фрагментированный MP4: mdat пишется сразу (иначе классический moov в конце
+        # долго даёт 0 B на диске при -c copy с HLS).
+        "-movflags",
+        "frag_keyframe+empty_moov+default_base_moof",
+        "-flush_packets",
+        "1",
         "-y",
         str(output_path),
     ]

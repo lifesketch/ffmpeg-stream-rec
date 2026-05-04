@@ -107,7 +107,7 @@
               <td class="session-col-start mono small">{{ s.created_at | fmt_dt }}</td>
               <td class="session-col-end mono small ended-at-cell">{{ s.ended_at | fmt_dt }}</td>
               <td class="session-col-size live-file-size mono small">
-                {% if s.status == 'recording' %}
+                {% if lb > 0 %}
                   {% if lb < 1048576 %}
                     {{ "%.1f"|format(lb / 1024) }} KB
                   {% else %}
@@ -178,6 +178,7 @@
         <thead>
           <tr>
             <th>Файл</th>
+            <th>Дата и время в каталоге</th>
             <th>Скачать</th>
             <th>Инфо</th>
             <th>Проверка</th>
@@ -185,19 +186,20 @@
           </tr>
         </thead>
         <tbody>
-          {% for rel in files %}
+          {% for f in files %}
             <tr>
-              <td class="mono small">{{ rel }}</td>
-              <td><a href="{{ url_for('main.files_download', rel_path=rel) }}">download</a></td>
-              <td><a href="{{ url_for('main.files_info', rel_path=rel) }}" target="_blank">ffprobe</a></td>
+              <td class="mono small">{{ f.rel }}</td>
+              <td class="mono small">{{ f.saved_at }}</td>
+              <td><a href="{{ url_for('main.files_download', rel_path=f.rel) }}">download</a></td>
+              <td><a href="{{ url_for('main.files_info', rel_path=f.rel) }}" target="_blank">ffprobe</a></td>
               <td>
-                <form method="post" action="{{ url_for('main.files_check', rel_path=rel) }}">
+                <form method="post" action="{{ url_for('main.files_check', rel_path=f.rel) }}">
                   <button type="submit">ffmpeg -v error</button>
                 </form>
               </td>
               <td>
-                <form method="post" action="{{ url_for('main.files_delete') }}" onsubmit="return confirm('Удалить {{ rel }}?');">
-                  <input type="hidden" name="rel_path" value="{{ rel }}">
+                <form method="post" action="{{ url_for('main.files_delete') }}" onsubmit="return confirm('Удалить {{ f.rel }}?');">
+                  <input type="hidden" name="rel_path" value="{{ f.rel }}">
                   <input type="hidden" name="confirm" value="yes">
                   <button type="submit" class="danger">Удалить</button>
                 </form>

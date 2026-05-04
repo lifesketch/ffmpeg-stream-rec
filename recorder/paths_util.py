@@ -117,6 +117,13 @@ def allocate_unique_starting_part(
         )
         if not target.is_file():
             return part
+        # Пустые обломки прошлых падений FFmpeg занимают «001» и ломают ожидания UI.
+        try:
+            if target.stat().st_size == 0:
+                target.unlink()
+                return part
+        except OSError:
+            pass
     raise ValueError(
         "Не удалось найти свободный номер части в каталоге назначения "
         "(слишком много файлов)"

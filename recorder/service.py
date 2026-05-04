@@ -74,6 +74,7 @@ class RecordingService:
         self._log = logger
         self._lock = threading.Lock()
         self._shutdown_all_lock = threading.Lock()
+        self._start_lock = threading.Lock()
         self._local_procs: dict[str, subprocess.Popen] = {}
         self._ffmpeg_stderr_preview: dict[str, str] = {}
 
@@ -131,49 +132,50 @@ class RecordingService:
                 f"Достигнут лимит активных записей ({max_sess} независимых сессий)"
             )
 
-        part = paths_util.allocate_unique_starting_part(
-            self.recordings_root,
-            storage_mode,
-            subpath,
-            basename,
-        )
-        out_path = paths_util.output_mp4_path(
-            self.recordings_root,
-            storage_mode,
-            subpath,
-            basename,
-            part,
-        )
-        browser_hint = storage_mode == 3
+        with self._start_lock:
+            part = paths_util.allocate_unique_starting_part(
+                self.recordings_root,
+                storage_mode,
+                subpath,
+                basename,
+            )
+            out_path = paths_util.output_mp4_path(
+                self.recordings_root,
+                storage_mode,
+                subpath,
+                basename,
+                part,
+            )
+            browser_hint = storage_mode == 3
 
-        args = ffmpeg_utils.build_record_args(
-            self._cfg["FFMPEG_BIN"],
-            stream_url,
-            out_path,
-        )
+            args = ffmpeg_utils.build_record_args(
+                self._cfg["FFMPEG_BIN"],
+                stream_url,
+                out_path,
+            )
 
-        proc = subprocess.Popen(
-            args,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=_ffmpeg_stderr_popen_arg(),
-            close_fds=True,
-        )
-        rel = paths_util.relative_to_recordings(self.recordings_root, out_path)
+            proc = subprocess.Popen(
+                args,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=_ffmpeg_stderr_popen_arg(),
+                close_fds=True,
+            )
+            rel = paths_util.relative_to_recordings(self.recordings_root, out_path)
 
-        sid = self._store.create_session(
-            stream_url=stream_url,
-            storage_mode=storage_mode,
-            subpath=subpath,
-            basename=basename,
-            current_part=part,
-            max_continuations=int(self._cfg["MAX_CONTINUATIONS"]),
-            browser_download_hint=browser_hint,
-            status="recording",
-            pid=proc.pid,
-            current_output_path=rel,
-        )
-        self._local_procs[sid] = proc
+            sid = self._store.create_session(
+                stream_url=stream_url,
+                storage_mode=storage_mode,
+                subpath=subpath,
+                basename=basename,
+                current_part=part,
+                max_continuations=int(self._cfg["MAX_CONTINUATIONS"]),
+                browser_download_hint=browser_hint,
+                status="recording",
+                pid=proc.pid,
+                current_output_path=rel,
+            )
+            self._local_procs[sid] = proc
 
         threading.Thread(
             target=self._watch_popen,
@@ -377,26 +379,27 @@ class RecordingService:
             row.basename,
             row.current_part,
         )
-        args = ffmpeg_utils.build_record_args(
-            self._cfg["FFMPEG_BIN"],
-            row.stream_url,
-            out_path,
-        )
-        proc = subprocess.Popen(
-            args,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=_ffmpeg_stderr_popen_arg(),
-            close_fds=True,
-        )
-        rel = paths_util.relative_to_recordings(self.recordings_root, out_path)
-        self._store.update(
-            session_id,
-            status="recording",
-            pid=proc.pid,
-            current_output_path=rel,
-        )
-        self._local_procs[session_id] = proc
+        with self._start_lock:
+            args = ffmpeg_utils.build_record_args(
+                self._cfg["FFMPEG_BIN"],
+                row.stream_url,
+                out_path,
+            )
+            proc = subprocess.Popen(
+                args,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=_ffmpeg_stderr_popen_arg(),
+                close_fds=True,
+            )
+            rel = paths_util.relative_to_recordings(self.recordings_root, out_path)
+            self._store.update(
+                session_id,
+                status="recording",
+                pid=proc.pid,
+                current_output_path=rel,
+            )
+            self._local_procs[session_id] = proc
         threading.Thread(
             target=self._watch_popen,
             args=(session_id, proc),
@@ -498,25 +501,96 @@ class RecordingService:
                 continue
         return None
 
+    def _live_bytes_via_psutil_open_files(self, pid: int, expected_name: str) -> int | None:
+        """macOS и др.: размер открытого mp4 по open_files(), если путь из БД не совпал со stat()."""
+        if pid <= 0:
+            return None
+        root = self.recordings_root.resolve()
+        try:
+            proc = psutil.Process(pid)
+        except psutil.Error:
+            return None
+        try:
+            for openf in proc.open_files() or []:
+                try:
+                    p = Path(openf.path).resolve()
+                    if p.name != expected_name:
+                        continue
+                    p.relative_to(root)
+                    if p.is_file():
+                        return int(p.stat().st_size)
+                except (OSError, ValueError):
+                    continue
+        except psutil.Error:
+            return None
+        return None
+
     def current_recording_file_bytes(self, session_id: str) -> int:
-        """Размер текущего выходного .mp4 в байтах (0 если не идёт запись или файла ещё нет)."""
+        """
+        Размер текущего выходного .mp4 в байтах.
+        При активной записи — с диска и при необходимости по pid; после остановки —
+        размер последнего файла по current_output_path (чтобы в UI не пропадал вес).
+        """
         row = self._store.get(session_id)
-        if not row or row.status != "recording" or not row.current_output_path:
+        if not row:
             return 0
         expected_name = f"{row.basename}_{row.current_part:03d}.mp4"
+
+        def _stat_size(path: Path) -> int | None:
+            try:
+                if path.is_file():
+                    return int(path.stat().st_size)
+            except OSError:
+                return None
+            return None
+
+        # 1) Канонический путь (тот же расчёт, что при старте FFmpeg) — не зависит от строки в БД.
+        sizes: list[int] = []
         try:
-            p = paths_util.resolve_mp4_under_recordings_root(
-                self.recordings_root, row.current_output_path
+            canon = paths_util.expected_output_mp4_path(
+                self.recordings_root,
+                row.storage_mode,
+                row.subpath,
+                row.basename,
+                row.current_part,
             )
-            if p.is_file():
-                return int(p.stat().st_size)
-        except (OSError, ValueError, FileNotFoundError):
+            z = _stat_size(canon)
+            if z is not None:
+                sizes.append(z)
+        except ValueError:
             pass
+
+        # 2) Путь из БД (на случай рассинхрона имён/частей).
+        rel = (row.current_output_path or "").strip()
+        if rel:
+            try:
+                p = paths_util.resolve_mp4_under_recordings_root(
+                    self.recordings_root, rel
+                )
+                z = _stat_size(p)
+                if z is not None:
+                    sizes.append(z)
+            except (OSError, ValueError, FileNotFoundError):
+                pass
+
+        disk_max = max(sizes) if sizes else 0
+
+        if row.status != "recording":
+            return disk_max
+
+        if disk_max > 0:
+            return disk_max
 
         if row.pid:
             via_proc = self._live_bytes_via_proc_fd(int(row.pid), expected_name)
             if via_proc is not None:
                 return via_proc
+            # На macOS open_files() у чужого FFmpeg почти всегда пустой — ниже не полагаемся.
+            via_of = self._live_bytes_via_psutil_open_files(
+                int(row.pid), expected_name
+            )
+            if via_of is not None:
+                return via_of
 
         return 0
 
