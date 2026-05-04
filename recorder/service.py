@@ -55,6 +55,18 @@ def _ffmpeg_stderr_tail_for_diagnostics(raw: bytes, *, max_chars: int = 6000) ->
     return "…" + s[-max_chars:]
 
 
+def _ffmpeg_stderr_popen_arg() -> int:
+    """
+    По умолчанию stderr в DEVNULL: иначе на macOS / Jupyter при HLS stderr
+    (в т.ч. «Will reconnect…») может заполнить пайп (~64 KiB), FFmpeg блокируется
+    и MP4 остаётся 0 B. Для хвоста в /record/status задайте RECORDING_FFMPEG_STDERR_PIPE=1.
+    """
+    raw = (os.environ.get("RECORDING_FFMPEG_STDERR_PIPE", "") or "").strip().lower()
+    if raw in ("1", "true", "yes", "on"):
+        return subprocess.PIPE
+    return subprocess.DEVNULL
+
+
 class RecordingService:
     def __init__(self, config: dict, store: SessionStore, logger) -> None:
         self._cfg = config
@@ -144,7 +156,7 @@ class RecordingService:
             args,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
+            stderr=_ffmpeg_stderr_popen_arg(),
             close_fds=True,
         )
         rel = paths_util.relative_to_recordings(self.recordings_root, out_path)
@@ -208,10 +220,20 @@ class RecordingService:
 
     def _watch_popen(self, session_id: str, proc: subprocess.Popen) -> None:
         """
-        Ждать FFmpeg. stderr читается в отдельном потоке порциями: иначе при заполнении
-        пайпа (~64 KiB) процесс блокируется на записи в stderr. Дополнительно в argv
-        добавлены -nostats и -loglevel warning, чтобы не заливать stderr прогрессом.
+        Ждать FFmpeg. Если stderr=DEVNULL (по умолчанию), блокировки пайпа нет.
+        При RECORDING_FFMPEG_STDERR_PIPE=1 stderr в PIPE и читается в отдельном потоке.
         """
+        if proc.stderr is None:
+            rc = 0
+            try:
+                rc = proc.wait()
+            finally:
+                pass
+            self._clear_ffmpeg_stderr_preview(session_id)
+            self._local_procs.pop(session_id, None)
+            self._handle_process_exit(session_id, exit_code=rc, stderr_tail="")
+            return
+
         stderr_holder: list[bytes] = []
 
         def drain_stderr() -> None:
@@ -364,7 +386,7 @@ class RecordingService:
             args,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
+            stderr=_ffmpeg_stderr_popen_arg(),
             close_fds=True,
         )
         rel = paths_util.relative_to_recordings(self.recordings_root, out_path)

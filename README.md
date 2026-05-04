@@ -97,7 +97,7 @@ docker compose down               # остановка; каталог docker-da
 
 Если вы раньше поднимали сервис с именованным томом **`recorder-data`**, старые файлы остались в том томе; при необходимости скопируйте MP4 в **`docker-data/recordings/`** (путь к данным на хосте смотрите через `docker volume inspect` для нужного тома).
 
-**Диагностика записи:** если во время записи размер на диске **0** и после остановки файла нет, откройте в браузере **`/record/status`** (JSON). Для активной сессии смотрите поле **`ffmpeg_stderr_excerpt`** — там хвост лога FFmpeg (ошибки сети, HTTP 403, DNS и т.д.). В контейнере: `ls -la /data/recordings` и `sudo docker compose logs recorder --tail 80`.
+**Диагностика записи:** по умолчанию stderr FFmpeg **не** идёт в API (иначе на macOS/Jupyter при HLS можно забить пайп и получить **0 B**). Чтобы в **`/record/status`** было поле **`ffmpeg_stderr_excerpt`**, задайте в **`.env`**: **`RECORDING_FFMPEG_STDERR_PIPE=1`**. Логи приложения: **`LOG_DIR/app.log`**. В Docker: `ls -la docker-data/recordings` и `docker compose logs recorder --tail 80`.
 
 ## Jupyter Notebook
 
