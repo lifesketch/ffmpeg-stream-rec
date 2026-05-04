@@ -12,6 +12,10 @@ def build_record_args(
     return [
         ffmpeg_bin,
         "-nostdin",
+        "-hide_banner",
+        "-nostats",
+        "-loglevel",
+        "warning",
         # Не добавляем -reconnect*: на части HLS (в т.ч. .ts по HTTPS) FFmpeg уходит в цикл
         # «Will reconnect… error=End of file» и на диске 0 B, хотя без этих флагов поток идёт.
         "-i",

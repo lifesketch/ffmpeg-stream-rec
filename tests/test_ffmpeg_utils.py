@@ -14,6 +14,8 @@ def test_build_record_args_contains_io(tmp_path):
     assert "https://x/y.m3u8" in args
     assert str(out) in args
     assert "-c" in args and "copy" in args
+    assert "-nostats" in args
+    assert "-loglevel" in args and "warning" in args
 
 
 def test_build_integrity_check_args(tmp_path):

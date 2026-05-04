@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import subprocess
 from unittest.mock import MagicMock
 
 import pytest
@@ -29,14 +28,7 @@ def app(tmp_media_root, monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "pytest-secret-key")
     monkeypatch.setenv("RECORDING_AUTH_TOKEN", "")
 
-    def fake_popen(*_args, **kwargs):
-        # stderr в файл: закрываем сразу, иначе тесты не вызывают реальный _watch_popen и дескриптор утекает.
-        err = kwargs.get("stderr")
-        if err is not None and err not in (subprocess.DEVNULL, subprocess.PIPE):
-            try:
-                err.close()
-            except OSError:
-                pass
+    def fake_popen(*_args, **_kwargs):
         proc = MagicMock()
         proc.pid = 999001
         proc.poll.return_value = None
