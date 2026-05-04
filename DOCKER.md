@@ -41,10 +41,22 @@ docker compose up -d
 
 ## Статус и логи
 
+Без `sudo` (если пользователь в группе `docker`):
+
 ```bash
 docker compose ps
+docker compose logs recorder --tail 30
 docker compose logs recorder --tail 80
 docker compose logs -f recorder
+```
+
+На Synology чаще нужен **`sudo`**:
+
+```bash
+sudo docker compose ps
+sudo docker compose logs recorder --tail 30
+sudo docker compose logs recorder --tail 80
+sudo docker compose logs -f recorder
 ```
 
 Остановка контейнера (данные в **`docker-data/`** на диске остаются):
