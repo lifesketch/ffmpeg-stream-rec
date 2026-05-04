@@ -21,6 +21,40 @@ def _utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _ffmpeg_stderr_tail_for_diagnostics(raw: bytes, *, max_chars: int = 6000) -> str:
+    """
+    Срез stderr для логов. Баннер «ffmpeg version … configuration:» занимает десятки KiB;
+    при взятии «последних N символов» реальная ошибка (часто в начале короткого stderr)
+    теряется — ищем типичные маркеры и берём хвост с последнего вхождения.
+    """
+    if not raw:
+        return ""
+    s = raw.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+    for needle in (
+        "Conversion failed!",
+        "Invalid data found",
+        "Server returned ",
+        "HTTP error",
+        "Protocol not found",
+        "Error opening",
+        "Error while opening",
+        "Assertion ",
+        "Unknown format",
+        "Option ",
+        "[hls @",
+        "Input #0,",
+    ):
+        i = s.rfind(needle)
+        if i != -1:
+            chunk = s[i:]
+            if len(chunk) > max_chars:
+                return chunk[: max_chars - 1] + "…"
+            return chunk
+    if len(s) <= max_chars:
+        return s
+    return "…" + s[-max_chars:]
+
+
 class RecordingService:
     def __init__(self, config: dict, store: SessionStore, logger) -> None:
         self._cfg = config
@@ -211,7 +245,7 @@ class RecordingService:
         self._clear_ffmpeg_stderr_preview(session_id)
         self._local_procs.pop(session_id, None)
         raw = stderr_holder[0] if stderr_holder else b""
-        stderr_tail = raw.decode("utf-8", errors="replace")[-4000:]
+        stderr_tail = _ffmpeg_stderr_tail_for_diagnostics(raw)
         self._handle_process_exit(session_id, exit_code=rc, stderr_tail=stderr_tail)
 
     def _watch_external_pid(self, session_id: str, pid: int) -> None:

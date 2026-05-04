@@ -138,7 +138,7 @@ https://cdn.example.org/live/channel-id/index.m3u8
 ### B.2. Базовая команда FFmpeg
 
 ```bash
-ffmpeg -nostdin -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -reconnect_at_eof 1 \
+ffmpeg -nostdin \
 -i "URL" \
 -c copy -bsf:a aac_adtstoasc recordings/output1.mp4
 ```
@@ -146,9 +146,10 @@ ffmpeg -nostdin -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -recon
 | Параметр | Назначение |
 |----------|------------|
 | `-nostdin` | Не зависать при фоновом запуске |
-| `-reconnect*` | Переподключение при обрыве HLS |
 | `-c copy` | Без перекодирования |
 | `-bsf:a aac_adtstoasc` | AAC пригодный для MP4 |
+
+Флаги `-reconnect*` в продукте **не используются**: на ряде HLS они провоцировали бесконечные реконнекты и нулевой размер файла; устойчивость к обрывам — через авто‑продолжение в новый файл в приложении.
 
 ### B.3. Проверка целостности
 
