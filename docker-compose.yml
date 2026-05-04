@@ -1,5 +1,6 @@
 # Локальная разработка: python -m recorder из venv (без Docker).
 #
+# Перед первым up на части хостов (Synology и др.): mkdir -p docker-data
 # Docker: данные на хосте в ./docker-data/ (удобно копировать проект вместе с записями):
 #   docker-data/recordings/  — MP4
 #   docker-data/state.sqlite3
