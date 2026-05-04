@@ -56,25 +56,40 @@ FLASK_RUN_PORT=8080 python -m recorder
 
 Локальный запуск **`python -m recorder`** из venv **не требует Docker и не меняется**.
 
-Образ и `docker-compose.yml` — развёртывание в том числе на Synology. Данные на **хосте** лежат в каталоге **`docker-data/`** в корне проекта (bind-mount на `/data` в контейнере):
-
-- **`docker-data/recordings/`** — MP4;
-- **`docker-data/state.sqlite3`** — сессии;
-- **`docker-data/logs/`** — логи приложения.
-
-Папки создаются при первом `docker compose up`. Скопируйте на NAS весь проект (или архив) — достаточно вместе с **`docker-data/`**, если нужны уже записанные файлы. Если раньше стоял **именованный том** `recorder-data`, старые MP4 остались внутри тома Docker (`docker volume inspect …`); при необходимости перенесите их в **`docker-data/recordings/`** на хосте.
+Нужны **Docker** и **Docker Compose** (v2, команда `docker compose`). В корне репозитория:
 
 ```bash
-cp .env.example .env   # SECRET_KEY обязателен; см. комментарии про HOST_PORT и Docker
+cd /path/to/ffmpeg-stream-rec
+cp .env.example .env
+# В .env обязательно задайте SECRET_KEY; при занятом порте — HOST_PORT (см. .env.example)
+
 docker compose build
 docker compose up -d
 ```
 
-- Интерфейс по умолчанию: **http://127.0.0.1:8080** (`HOST_PORT` в `.env` или значение по умолчанию в compose).
-- Если порт занят — в `.env`: **`HOST_PORT=9000`**.
-- Переменные **`RECORDINGS_ROOT`**, **`STATE_DB_PATH`**, **`LOG_DIR`** из `.env` в контейнере **переопределяются** compose (см. `environment` в `docker-compose.yml`); в `.env` они нужны для локального запуска без Docker.
+Интерфейс: **http://127.0.0.1:8080** или, с другой машины в сети, **http://IP-адрес-хоста:8080**. Порт на хосте задаётся **`HOST_PORT`** в `.env` (по умолчанию **8080** в `docker-compose.yml`).
 
-Остановка контейнера **без** удаления записей: `docker compose down`. Каталог **`docker-data/`** на диске остаётся. Для доступа из сети задайте **`RECORDING_AUTH_TOKEN`** в `.env`.
+Данные на диске хоста — каталог **`docker-data/`** рядом с `docker-compose.yml` (bind-mount на **`/data`** в контейнере):
+
+- **`docker-data/recordings/`** — MP4;
+- **`docker-data/state.sqlite3`** — состояние сессий;
+- **`docker-data/logs/`** — логи приложения.
+
+Подкаталоги создаются при первом запуске. Чтобы перенести установку на другой хост, скопируйте репозиторий вместе с **`docker-data/`**.
+
+Дополнительные команды:
+
+```bash
+docker compose logs -f recorder   # поток логов контейнера
+docker compose ps
+docker compose down               # остановка; каталог docker-data/ не удаляется
+```
+
+Переменные **`RECORDINGS_ROOT`**, **`STATE_DB_PATH`**, **`LOG_DIR`** для путей внутри контейнера задаёт **`docker-compose.yml`** (`environment`). Одноимённые строки в **`.env`** на эти пути в Docker **не влияют** — они используются при локальном запуске без Docker.
+
+Опционально для доступа с проверкой токена: **`RECORDING_AUTH_TOKEN`** в `.env` (см. комментарии в `.env.example`).
+
+Если вы раньше поднимали сервис с именованным томом **`recorder-data`**, старые файлы остались в том томе; при необходимости скопируйте MP4 в **`docker-data/recordings/`** (путь к данным на хосте смотрите через `docker volume inspect` для нужного тома).
 
 ## Jupyter Notebook
 

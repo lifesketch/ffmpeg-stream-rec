@@ -1,6 +1,6 @@
 # Локальная разработка: python -m recorder из venv (без Docker).
 #
-# Docker: данные на хосте в ./docker-data/ (удобно копировать проект + папку на NAS):
+# Docker: данные на хосте в ./docker-data/ (удобно копировать проект вместе с записями):
 #   docker-data/recordings/  — MP4
 #   docker-data/state.sqlite3
 #   docker-data/logs/
