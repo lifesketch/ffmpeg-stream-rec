@@ -173,6 +173,9 @@ def record_status():
     for s in svc.list_sessions():
         parts = svc.completed_parts(s.id)
         live_bytes = svc.current_recording_file_bytes(s.id)
+        ff_excerpt = (
+            svc.ffmpeg_stderr_preview(s.id) if s.status == "recording" else ""
+        )
         out.append(
             {
                 "id": s.id,
@@ -186,6 +189,7 @@ def record_status():
                 "current_output_path": s.current_output_path,
                 "current_file_bytes": live_bytes,
                 "current_file_mb": round(live_bytes / (1024 * 1024), 2),
+                "ffmpeg_stderr_excerpt": ff_excerpt,
                 "created_at": s.created_at,
                 "ended_at": s.ended_at,
                 "started_at_local": format_iso_local(s.created_at),

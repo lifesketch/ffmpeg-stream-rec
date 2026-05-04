@@ -63,6 +63,10 @@ cd /path/to/ffmpeg-stream-rec
 cp .env.example .env
 # В .env обязательно задайте SECRET_KEY; при занятом порте — HOST_PORT (см. .env.example)
 
+mkdir -p docker-data
+# На части хостов (в т.ч. Synology DSM) Docker не создаёт каталог для bind-mount сам —
+# без mkdir возможна ошибка: Bind mount failed: '.../docker-data' does not exist
+
 docker compose build
 docker compose up -d
 ```
@@ -90,6 +94,8 @@ docker compose down               # остановка; каталог docker-da
 Опционально для доступа с проверкой токена: **`RECORDING_AUTH_TOKEN`** в `.env` (см. комментарии в `.env.example`).
 
 Если вы раньше поднимали сервис с именованным томом **`recorder-data`**, старые файлы остались в том томе; при необходимости скопируйте MP4 в **`docker-data/recordings/`** (путь к данным на хосте смотрите через `docker volume inspect` для нужного тома).
+
+**Диагностика записи:** если во время записи размер на диске **0** и после остановки файла нет, откройте в браузере **`/record/status`** (JSON). Для активной сессии смотрите поле **`ffmpeg_stderr_excerpt`** — там хвост лога FFmpeg (ошибки сети, HTTP 403, DNS и т.д.). В контейнере: `ls -la /data/recordings` и `sudo docker compose logs recorder --tail 80`.
 
 ## Jupyter Notebook
 

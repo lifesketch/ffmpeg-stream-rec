@@ -29,6 +29,8 @@ class RecordingService:
         self._lock = threading.Lock()
         self._shutdown_all_lock = threading.Lock()
         self._local_procs: dict[str, subprocess.Popen] = {}
+        # Хвост stderr FFmpeg для активной сессии (диагностика в /record/status).
+        self._ffmpeg_stderr_preview: dict[str, str] = {}
 
     @property
     def recordings_root(self) -> Path:
@@ -154,17 +156,62 @@ class RecordingService:
             )
         return sid, basename, part
 
+    def _append_ffmpeg_stderr_preview(self, session_id: str, chunk: bytes) -> None:
+        if not chunk:
+            return
+        add = chunk.decode("utf-8", errors="replace")
+        with self._lock:
+            prev = self._ffmpeg_stderr_preview.get(session_id, "")
+            merged = (prev + add)[-6000:]
+            self._ffmpeg_stderr_preview[session_id] = merged
+
+    def _clear_ffmpeg_stderr_preview(self, session_id: str) -> None:
+        with self._lock:
+            self._ffmpeg_stderr_preview.pop(session_id, None)
+
+    def ffmpeg_stderr_preview(self, session_id: str) -> str:
+        with self._lock:
+            return self._ffmpeg_stderr_preview.get(session_id, "")
+
     def _watch_popen(self, session_id: str, proc: subprocess.Popen) -> None:
-        rc = proc.wait()
-        stderr_tail = ""
-        if proc.stderr:
+        """
+        Ждать FFmpeg. stderr читается в отдельном потоке порциями: иначе при заполнении
+        пайпа (~64 KiB) процесс блокируется на записи в stderr, а здесь чтение было
+        только после wait() — взаимная блокировка, файл не растёт, размер в UI = 0.
+        """
+        stderr_holder: list[bytes] = []
+
+        def drain_stderr() -> None:
+            if not proc.stderr:
+                stderr_holder.append(b"")
+                return
+            parts: list[bytes] = []
             try:
-                err = proc.stderr.read()
-                if err:
-                    stderr_tail = err.decode("utf-8", errors="replace")[-4000:]
+                while True:
+                    chunk = proc.stderr.read(4096)
+                    if not chunk:
+                        break
+                    parts.append(chunk)
+                    self._append_ffmpeg_stderr_preview(session_id, chunk)
             except Exception:
                 pass
+            stderr_holder.append(b"".join(parts))
+
+        drainer = threading.Thread(
+            target=drain_stderr,
+            daemon=True,
+            name=f"fferr-{session_id}",
+        )
+        drainer.start()
+        rc = 0
+        try:
+            rc = proc.wait()
+        finally:
+            drainer.join(timeout=120)
+        self._clear_ffmpeg_stderr_preview(session_id)
         self._local_procs.pop(session_id, None)
+        raw = stderr_holder[0] if stderr_holder else b""
+        stderr_tail = raw.decode("utf-8", errors="replace")[-4000:]
         self._handle_process_exit(session_id, exit_code=rc, stderr_tail=stderr_tail)
 
     def _watch_external_pid(self, session_id: str, pid: int) -> None:
