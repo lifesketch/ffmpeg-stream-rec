@@ -270,6 +270,22 @@ class RecordingService:
         except (OSError, ValueError, FileNotFoundError):
             pass
 
+    def _part_file_too_small_for_graceful_complete(self, row: SessionRow) -> bool:
+        """
+        FFmpeg иногда выходит с 0 при обрыве HLS/HTTPS до появления данных в MP4.
+        Такой «успех» не считаем завершением записи — идём в ветку авто-продолжения.
+        """
+        rel = row.current_output_path
+        if not rel:
+            return True
+        try:
+            p = paths_util.resolve_mp4_under_recordings_root(self.recordings_root, rel)
+            if not p.is_file():
+                return True
+            return p.stat().st_size < 2048
+        except (OSError, ValueError):
+            return True
+
     def _handle_process_exit(
         self,
         session_id: str,
@@ -296,6 +312,14 @@ class RecordingService:
                 self._log.info("Сессия %s остановлена вручную", session_id)
                 self._unlink_ffmpeg_stderr_log(session_id)
                 return
+
+            if exit_code == 0 and self._part_file_too_small_for_graceful_complete(row):
+                self._log.warning(
+                    "Сессия %s: FFmpeg code=0, но файл части слишком мал (%s) — обрабатываем как сбой источника",
+                    session_id,
+                    row.current_output_path or "—",
+                )
+                exit_code = 1
 
             if exit_code == 0:
                 self._store.update(
