@@ -54,6 +54,8 @@ FLASK_RUN_PORT=8080 python -m recorder
 
 ## Docker
 
+**Шпаргалка команд (сборка, up, логи, проверки):** [DOCKER.md](DOCKER.md).
+
 Локальный запуск **`python -m recorder`** из venv **не требует Docker и не меняется**.
 
 Нужны **Docker** и **Docker Compose** (v2, команда `docker compose`). В корне репозитория:
