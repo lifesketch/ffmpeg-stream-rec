@@ -21,6 +21,12 @@ docker compose build
 docker compose up -d
 ```
 
+**Почему так настроено compose (и это не трогает Jupyter):**
+
+- **`init: true`** — в контейнере PID 1 — это *tini*: корректная доставка **SIGTERM** при `docker stop` и уменьшение проблем с дочерними процессами FFmpeg (зомби). Локальный ноутбук поднимает **`recorder.dev_server_main`**, не `python -m recorder`.
+- **`healthcheck`** — проверка `GET /` изнутри контейнера; в `docker compose ps` видно `healthy`. На работу Jupyter не влияет.
+- Образ задаёт **`PYTHONUNBUFFERED=1`**, чтобы строки логов сразу попадали в `docker compose logs`.
+
 **Synology (SSH), тот же сценарий с `sudo`:**
 
 ```bash
@@ -167,4 +173,20 @@ pytest
 
 ## Автопроверка в репозитории
 
-В GitHub на push/PR workflow **Docker build** выполняет `docker compose config` и **`docker compose build`**. Зелёная галочка = образ на чистой Ubuntu собирается; это **не** проверяет твой NAS и **не** проверяет реальный HLS-поток.
+В GitHub на push/PR workflow **Docker build** выполняет:
+
+1. `docker compose config`
+2. `docker compose build`
+3. **Smoke:** из `.env.example` собирается временный `.env`, `compose up`, несколько запросов к `http://127.0.0.1:8080/` и `/record/status`, затем `compose down`.
+
+Зелёная галочка = образ собирается и приложение **поднимается** в контейнере. Это **не** проверяет твой NAS и **не** гоняет реальный HLS/FFmpeg-запись.
+
+### Что можно добавить позже (по желанию)
+
+| Идея | Зачем |
+|------|--------|
+| **Hadolint / Trivy** по Dockerfile | стиль слоёв, известные CVE базового образа |
+| **Отдельный nightly job** с `ffmpeg -i` на публичный тестовый HLS внутри `exec` | ловить сетевые/SSL регрессии в образе |
+| **`docker compose up` + pytest с `network_mode: host`** | сложнее в CI, обычно избыточно для этого проекта |
+
+Локально без Docker daemon достаточно **`pytest`**; с Docker — ручной сценарий из раздела «Первый запуск» + запись из UI.

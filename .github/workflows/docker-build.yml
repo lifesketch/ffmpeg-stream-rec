@@ -5,7 +5,7 @@ name: Docker build
 
 on:
   push:
-    branches: [main, develop, "feature/**"]
+    branches: [main, develop, "feature/**", "fix/**"]
   pull_request:
     branches: [main, develop]
 
@@ -20,3 +20,21 @@ jobs:
 
       - name: Build image
         run: docker compose build
+
+      - name: Smoke — контейнер стартует и отвечает HTTP
+        run: |
+          set -eux
+          cp .env.example .env
+          sed -i "s/^SECRET_KEY=.*/SECRET_KEY=$(openssl rand -hex 32)/" .env
+          mkdir -p docker-data
+          docker compose up -d
+          for i in $(seq 1 45); do
+            if curl -sf "http://127.0.0.1:8080/" -o /dev/null; then
+              echo "HTTP OK (try $i)"
+              break
+            fi
+            sleep 1
+          done
+          curl -sf "http://127.0.0.1:8080/" | head -c 50 | grep -q . || (docker compose logs --tail 80; exit 1)
+          curl -sf "http://127.0.0.1:8080/record/status" | head -c 80 | grep -q sessions || (docker compose logs --tail 80; exit 1)
+          docker compose down

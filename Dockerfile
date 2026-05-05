@@ -7,6 +7,9 @@ RUN apt-get update \
 
 WORKDIR /app
 
+# Логи сразу в docker compose logs (иначе буфер stdout).
+ENV PYTHONUNBUFFERED=1
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
