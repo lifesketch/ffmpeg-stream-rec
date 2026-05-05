@@ -18,3 +18,5 @@ data/
 docker-data/
 .ipynb_checkpoints/
 notebooks/.dev_server_state.json
+# Локальные настройки Cursor IDE (плагины и т.п.); .cursor/skills/ по-прежнему в git
+.cursor/settings.json
