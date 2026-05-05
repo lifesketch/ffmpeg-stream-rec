@@ -2,6 +2,8 @@
 
 Веб‑приложение на Flask для записи HLS (`.m3u8`) в MP4 через FFmpeg по [техническому заданию](docs/business-requirements/flask_ffmpeg_recorder_spec.md).
 
+**Руководство пользователя (интерфейс, режимы, сессии, файлы):** [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
+
 ## Что такое HLS
 
 **HLS** расшифровывается как **HTTP Live Streaming** — способ отдавать видео и аудио по обычному HTTPS отдельными фрагментами. Обычно это плейлист в формате **`.m3u8`** и сегменты (например `.ts` или fMP4); плеер подкачивает следующие куски по мере воспроизведения.
@@ -28,10 +30,12 @@ cp .env.example .env
 
 ```bash
 pip install -r requirements-dev.txt
-pytest
+pytest tests/ -v
 ```
 
 Тесты используют временные каталоги и не запускают реальный FFmpeg: процесс записи и shutdown-hooks замоканы в [`tests/conftest.py`](tests/conftest.py).
+
+В **GitHub Actions** на push/PR отдельный workflow **Docker build** проверяет `docker compose` (в т.ч. сборку образа и короткий smoke после `up`). Подробности — в разделе «Автопроверка в репозитории» в [DOCKER.md](DOCKER.md).
 
 ## Запуск
 
@@ -115,7 +119,7 @@ python3 -m venv .venv && source .venv/bin/activate && pip install -r requirement
 python -m ipykernel install --user --name=ffmpeg-stream-rec --display-name="Python (ffmpeg-stream-rec .venv)"
 ```
 
-Перезагрузите окно (**Developer: Reload Window**), откройте ноутбук и при запросе ядра выберите **Python (ffmpeg-stream-rec .venv)**. Затем выполните **кодовую** ячейку — в выводе будет проверка HTTP и ссылка на http://127.0.0.1:5000 .
+Перезагрузите окно (**Developer: Reload Window**), откройте ноутбук и при запросе ядра выберите **Python (ffmpeg-stream-rec .venv)**. Затем выполните ячейку **«Запуск сервера»**: Flask поднимается **отдельным процессом** (`python -m recorder.dev_server_main`), это не то же самое, что `python -m recorder` в терминале. В выводе будет проверка HTTP и **фактический URL** (если порт **5000** занят — будет другой, например после AirPlay на macOS). Открывайте в браузере именно его, а не «на глаз» `http://127.0.0.1:5000` .
 
 ## Тестовый поток
 
@@ -134,8 +138,11 @@ python -m ipykernel install --user --name=ffmpeg-stream-rec --display-name="Pyth
 | `MAX_INDEPENDENT_SESSIONS` | Лимит параллельных независимых записей (по умолчанию 2) |
 | `MAX_CONTINUATIONS` | Лимит авто‑продолжений после аварии (по умолчанию 5) |
 | `DEFAULT_RECORDING_BASENAME` | Подставляется в форму и в поле, если оставить пустым (по умолчанию `steam1`) |
-| `RECORDING_SHUTDOWN_HOOKS` | Если не `0`/`false` — при SIGTERM, SIGINT и при завершении процесса активные записи останавливаются как по кнопке «Стоп» (по умолчанию включено) |
+| `SECRET_KEY` | Секрет сессий Flask; для Docker скопируйте `.env.example` и задайте надёжное значение (в dev допустим placeholder из примера) |
+| `RECORDING_SHUTDOWN_HOOKS` | В **`python -m recorder`** и **Docker** по умолчанию включено: при SIGTERM/SIGINT и выходе процесса активные записи останавливаются как по «Стоп». В ноутбуке сервер обычно идёт через **`recorder.dev_server_main`**, где по умолчанию **`0`** (остановка — UI и ячейка «Остановка сервера»). Если `create_app()` вызывается **внутри ядра** IPython, без явного `=1` в `.env` хуки тоже отключаются (см. `recorder/__init__.py`) |
 | `RECORDING_SHUTDOWN_WAIT_SEC` | Сколько секунд ждать смены статуса сессий перед выходом процесса (по умолчанию 90) |
 | `RECORDING_AUTH_TOKEN` | Если задан — доступ к API/UI только с `Authorization: Bearer …` |
+| `RECORDING_FFMPEG_STDERR_PIPE` | Если `1` — в ответе `/record/status` появляется `ffmpeg_stderr_excerpt` (на шумных HLS/macOS может мешать записи в MP4; см. комментарии в `.env.example`) |
+| `FFMPEG_BIN` / `FFPROBE_BIN` | Исполняемые файлы FFmpeg/ffprobe (по умолчанию `ffmpeg` / `ffprobe` из `PATH`) |
 
-При остановке сервера записи завершаются штатно: FFmpeg получает мягкое завершение, файлы MP4 обычно остаются воспроизводимыми. Если процесс убит через **SIGKILL** (`kill -9`), это не перехватывается — возможен обрыв файла. В Jupyter обработчик сигналов может не установиться (не главный поток); тогда перед остановкой ядра лучше нажать «Стоп» в UI.
+При остановке сервера записи завершаются штатно: FFmpeg получает мягкое завершение, файлы MP4 обычно остаются воспроизводимыми. Если процесс убит через **SIGKILL** (`kill -9`), это не перехватывается — возможен обрыв файла. В Jupyter перед остановкой ядра лучше нажать **«Стоп»** в UI (и при необходимости ячейку **«Остановка сервера»** в ноутбуке).
