@@ -15,6 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Prepare env file for CI
+        run: |
+          cp .env.example .env
+          sed -i "s/^SECRET_KEY=.*/SECRET_KEY=$(openssl rand -hex 32)/" .env
+
       - name: Validate compose file
         run: docker compose config --quiet
 
@@ -24,8 +29,6 @@ jobs:
       - name: Smoke — контейнер стартует и отвечает HTTP
         run: |
           set -eux
-          cp .env.example .env
-          sed -i "s/^SECRET_KEY=.*/SECRET_KEY=$(openssl rand -hex 32)/" .env
           mkdir -p docker-data
           docker compose up -d
           for i in $(seq 1 45); do
