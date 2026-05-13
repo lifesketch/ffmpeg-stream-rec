@@ -1,0 +1,31 @@
+name: Sync to GitVerse
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+      - master
+      - development
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure GitVerse remote
+        run: |
+          git remote add gitverse https://lifesketch:${{ secrets.GITVERSE_TOKEN }}@gitverse.ru/lifesketch/ffmpeg-stream-rec.git
+
+      - name: Push branches
+        run: |
+          git push gitverse --all --force
+
+      - name: Push tags
+        run: |
+          git push gitverse --tags --force
