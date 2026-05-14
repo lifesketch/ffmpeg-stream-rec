@@ -1,0 +1,31 @@
+name: Sync Releases to GitVerse
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  sync-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Sync release to GitVerse
+        env:
+          GITHUB_RELEASE_NAME: ${{ github.event.release.name }}
+          GITHUB_RELEASE_BODY: ${{ github.event.release.body }}
+          GITHUB_TAG: ${{ github.event.release.tag_name }}
+          GITHUB_PRERELEASE: ${{ github.event.release.prerelease }}
+          GITHUB_DRAFT: ${{ github.event.release.draft }}
+          GITVERSE_TOKEN: ${{ secrets.GITVERSE_RELEASES_TOKEN }}
+        run: |
+          curl -X POST "https://gitverse.ru/api/v1/repos/lifesketch/ffmpeg-stream-rec/releases" \
+            -H "Authorization: Bearer ${GITVERSE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\
+              \"tag_name\": \"${GITHUB_TAG}\",\
+              \"name\": \"${GITHUB_RELEASE_NAME}\",\
+              \"body\": $(jq -Rs . <<< \"${GITHUB_RELEASE_BODY}\"),\
+              \"prerelease\": ${GITHUB_PRERELEASE},\
+              \"draft\": ${GITHUB_DRAFT}\
+            }"
