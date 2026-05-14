@@ -1,31 +1,196 @@
-name: Sync Releases to GitVerse
+name: Sync GitHub Release to GitVerse
 
 on:
   release:
-    types: [published]
+    types:
+      - published
+      - edited
+      - prereleased
+      - released
   workflow_dispatch:
+    inputs:
+      tag:
+        description: GitHub release tag to sync
+        required: true
+
+permissions:
+  contents: read
 
 jobs:
   sync-release:
     runs-on: ubuntu-latest
 
+    env:
+      GITVERSE_API: https://api.gitverse.ru
+      GITVERSE_USERNAME: ${{ vars.GITVERSE_USERNAME }}
+      GITVERSE_OWNER: ${{ vars.GITVERSE_OWNER }}
+      GITVERSE_REPO: ${{ vars.GITVERSE_REPO }}
+      GITVERSE_TOKEN: ${{ secrets.GITVERSE_TOKEN }}
+
     steps:
-      - name: Sync release to GitVerse
-        env:
-          GITHUB_RELEASE_NAME: ${{ github.event.release.name }}
-          GITHUB_RELEASE_BODY: ${{ github.event.release.body }}
-          GITHUB_TAG: ${{ github.event.release.tag_name }}
-          GITHUB_PRERELEASE: ${{ github.event.release.prerelease }}
-          GITHUB_DRAFT: ${{ github.event.release.draft }}
-          GITVERSE_TOKEN: ${{ secrets.GITVERSE_RELEASES_TOKEN }}
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: release
+        shell: bash
         run: |
-          curl -X POST "https://gitverse.ru/api/v1/repos/lifesketch/ffmpeg-stream-rec/releases" \
-            -H "Authorization: Bearer ${GITVERSE_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "{\
-              \"tag_name\": \"${GITHUB_TAG}\",\
-              \"name\": \"${GITHUB_RELEASE_NAME}\",\
-              \"body\": $(jq -Rs . <<< \"${GITHUB_RELEASE_BODY}\"),\
-              \"prerelease\": ${GITHUB_PRERELEASE},\
-              \"draft\": ${GITHUB_DRAFT}\
-            }"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Mirror release tag to GitVerse
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GITVERSE_USERNAME}" ] || [ -z "${GITVERSE_OWNER}" ] || [ -z "${GITVERSE_REPO}" ]; then
+            echo "GITVERSE_USERNAME, GITVERSE_OWNER and GITVERSE_REPO variables are required" >&2
+            exit 1
+          fi
+
+          git remote add gitverse "https://${GITVERSE_USERNAME}:${GITVERSE_TOKEN}@gitverse.ru/${GITVERSE_OWNER}/${GITVERSE_REPO}.git"
+          git push gitverse "refs/tags/${{ steps.release.outputs.tag }}:refs/tags/${{ steps.release.outputs.tag }}" --force
+
+      - name: Sync release metadata and assets
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const tag = process.env.RELEASE_TAG;
+
+            const gvOwner = process.env.GITVERSE_OWNER;
+            const gvRepo = process.env.GITVERSE_REPO;
+            const gvApi = process.env.GITVERSE_API;
+            const gvToken = process.env.GITVERSE_TOKEN;
+
+            const gvHeaders = {
+              Authorization: `Bearer ${gvToken}`,
+              Accept: 'application/vnd.gitverse.object+json;version=1',
+            };
+
+            async function gitverse(path, options = {}) {
+              const response = await fetch(`${gvApi}${path}`, {
+                ...options,
+                headers: {
+                  ...gvHeaders,
+                  ...(options.headers || {}),
+                },
+              });
+
+              const text = await response.text();
+              let body = null;
+              if (text) {
+                try {
+                  body = JSON.parse(text);
+                } catch {
+                  body = text;
+                }
+              }
+
+              if (!response.ok) {
+                const error = new Error(`GitVerse API ${response.status} ${response.statusText}: ${text}`);
+                error.status = response.status;
+                error.body = body;
+                throw error;
+              }
+
+              return body;
+            }
+
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner,
+              repo,
+              tag,
+            });
+
+            const payload = {
+              tag_name: release.tag_name,
+              target_commitish: release.target_commitish || context.sha,
+              name: release.name || release.tag_name,
+              body: release.body || '',
+              draft: Boolean(release.draft),
+              prerelease: Boolean(release.prerelease),
+            };
+
+            const encodedTag = encodeURIComponent(release.tag_name);
+            const releasesPath = `/repos/${encodeURIComponent(gvOwner)}/${encodeURIComponent(gvRepo)}/releases`;
+
+            let gvRelease;
+            try {
+              gvRelease = await gitverse(`${releasesPath}/tags/${encodedTag}`);
+              const updatedRelease = await gitverse(`${releasesPath}/${gvRelease.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+              });
+              gvRelease = updatedRelease || gvRelease;
+              core.info(`Updated GitVerse release ${gvRelease.id}`);
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+
+              gvRelease = await gitverse(releasesPath, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+              });
+              core.info(`Created GitVerse release ${gvRelease.id}`);
+            }
+
+            async function listGitVerseAssets(releaseId) {
+              const assets = [];
+              for (let page = 1; page <= 100; page += 1) {
+                const batch = await gitverse(`${releasesPath}/${releaseId}/assets?page=${page}&per_page=50`);
+                assets.push(...batch);
+                if (batch.length < 50) {
+                  break;
+                }
+              }
+              return assets;
+            }
+
+            const existingAssets = await listGitVerseAssets(gvRelease.id);
+            const existingByName = new Map(existingAssets.map((asset) => [asset.name, asset]));
+
+            for (const asset of release.assets) {
+              const existing = existingByName.get(asset.name);
+              if (existing) {
+                await gitverse(`${releasesPath}/${gvRelease.id}/assets/${existing.id}`, {
+                  method: 'DELETE',
+                });
+                core.info(`Deleted existing GitVerse asset ${asset.name}`);
+              }
+
+              const download = await fetch(asset.url, {
+                headers: {
+                  Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+                  Accept: 'application/octet-stream',
+                },
+              });
+
+              if (!download.ok) {
+                throw new Error(`GitHub asset download failed for ${asset.name}: ${download.status} ${download.statusText}`);
+              }
+
+              const bytes = await download.arrayBuffer();
+              const form = new FormData();
+              form.append('attachment', new Blob([bytes]), asset.name);
+
+              await gitverse(`${releasesPath}/${gvRelease.id}/assets?name=${encodeURIComponent(asset.name)}`, {
+                method: 'POST',
+                body: form,
+              });
+
+              core.info(`Uploaded GitVerse asset ${asset.name}`);
+            }
