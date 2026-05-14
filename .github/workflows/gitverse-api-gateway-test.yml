@@ -1,0 +1,42 @@
+name: GitVerse API Gateway Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-api-gateway:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Test GET releases on api.gitverse.ru
+        env:
+          GITVERSE_TOKEN: ${{ secrets.GITVERSE_RELEASES_TOKEN }}
+        run: |
+          echo "===== GET releases with PRIVATE-TOKEN ====="
+          curl -i \
+            -H "PRIVATE-TOKEN: ${GITVERSE_TOKEN}" \
+            -H "Accept: application/json" \
+            -H "User-Agent: Mozilla/5.0" \
+            https://api.gitverse.ru/repos/lifesketch/ffmpeg-stream-rec/releases || true
+
+      - name: Test GET release by tag on api.gitverse.ru
+        env:
+          GITVERSE_TOKEN: ${{ secrets.GITVERSE_RELEASES_TOKEN }}
+        run: |
+          echo "===== GET release by tag v1.0.0 with PRIVATE-TOKEN ====="
+          curl -i \
+            -H "PRIVATE-TOKEN: ${GITVERSE_TOKEN}" \
+            -H "Accept: application/json" \
+            -H "User-Agent: Mozilla/5.0" \
+            https://api.gitverse.ru/repos/lifesketch/ffmpeg-stream-rec/releases/tags/v1.0.0 || true
+
+      - name: Test GET releases with Bearer on api.gitverse.ru
+        env:
+          GITVERSE_TOKEN: ${{ secrets.GITVERSE_RELEASES_TOKEN }}
+        run: |
+          echo "===== GET releases with Bearer ====="
+          curl -i \
+            -H "Authorization: Bearer ${GITVERSE_TOKEN}" \
+            -H "Accept: application/json" \
+            -H "User-Agent: Mozilla/5.0" \
+            https://api.gitverse.ru/repos/lifesketch/ffmpeg-stream-rec/releases || true
