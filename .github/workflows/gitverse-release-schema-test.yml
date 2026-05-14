@@ -26,7 +26,7 @@ jobs:
             echo "========================================"
 
             curl -sS -i -X POST \
-              -H "Authorization: Bearer ${GITVERSE_TOKEN}" \
+              -H "Authorization: token ${GITVERSE_TOKEN}" \
               -H "Accept: application/json" \
               -H "Content-Type: application/json" \
               -H "User-Agent: Mozilla/5.0" \
