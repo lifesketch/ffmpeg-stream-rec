@@ -1,0 +1,48 @@
+name: GitVerse Release Schema Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  schema-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Test release API request schemas
+        env:
+          GITVERSE_TOKEN: ${{ secrets.GITVERSE_RELEASES_TOKEN }}
+        run: |
+          set +e
+
+          API_URL="https://api.gitverse.ru/repos/lifesketch/ffmpeg-stream-rec/releases"
+
+          test_payload() {
+            NAME="$1"
+            JSON="$2"
+
+            echo "========================================"
+            echo "TEST: ${NAME}"
+            echo "PAYLOAD: ${JSON}"
+            echo "========================================"
+
+            curl -sS -i -X POST \
+              -H "Authorization: Bearer ${GITVERSE_TOKEN}" \
+              -H "Accept: application/json" \
+              -H "Content-Type: application/json" \
+              -H "User-Agent: Mozilla/5.0" \
+              "${API_URL}" \
+              -d "${JSON}" \
+              | sed -n '1,80p'
+
+            echo
+          }
+
+          test_payload "Minimal tag only" '{"tag_name":"api-test-1"}'
+
+          test_payload "Tag and name" '{"tag_name":"api-test-2","name":"API Test Release"}'
+
+          test_payload "GitHub-style schema" '{"tag_name":"api-test-3","target_commitish":"develop","name":"API Test Release","body":"schema test"}'
+
+          test_payload "Draft release" '{"tag_name":"api-test-4","name":"Draft Release","body":"draft test","draft":true}'
+
+          test_payload "Prerelease" '{"tag_name":"api-test-5","name":"Prerelease","body":"pre-release test","prerelease":true}'
