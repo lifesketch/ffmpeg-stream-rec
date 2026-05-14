@@ -22,10 +22,10 @@ jobs:
 
     env:
       GITVERSE_API: https://api.gitverse.ru
-      GITVERSE_USERNAME: ${{ vars.GITVERSE_USERNAME }}
-      GITVERSE_OWNER: ${{ vars.GITVERSE_OWNER }}
-      GITVERSE_REPO: ${{ vars.GITVERSE_REPO }}
-      GITVERSE_TOKEN: ${{ secrets.GITVERSE_TOKEN }}
+      GITVERSE_USERNAME: ${{ vars.GITVERSE_USERNAME || github.repository_owner }}
+      GITVERSE_OWNER: ${{ vars.GITVERSE_OWNER || github.repository_owner }}
+      GITVERSE_REPO: ${{ vars.GITVERSE_REPO || github.event.repository.name }}
+      GITVERSE_TOKEN: ${{ secrets.GITVERSE_TOKEN || secrets.GITVERSE_RELEASES_TOKEN }}
 
     steps:
       - name: Checkout source repository
@@ -50,6 +50,11 @@ jobs:
 
           if [ -z "${GITVERSE_USERNAME}" ] || [ -z "${GITVERSE_OWNER}" ] || [ -z "${GITVERSE_REPO}" ]; then
             echo "GITVERSE_USERNAME, GITVERSE_OWNER and GITVERSE_REPO variables are required" >&2
+            exit 1
+          fi
+
+          if [ -z "${GITVERSE_TOKEN}" ]; then
+            echo "GITVERSE_TOKEN or GITVERSE_RELEASES_TOKEN secret is required" >&2
             exit 1
           fi
 
