@@ -4,9 +4,6 @@ on:
   release:
     types:
       - published
-      - edited
-      - prereleased
-      - released
   workflow_dispatch:
     inputs:
       tag:
