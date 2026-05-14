@@ -1,0 +1,73 @@
+name: Migrate Existing Releases to GitVerse
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate-releases:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Migrate GitHub releases to GitVerse
+        uses: actions/github-script@v7
+        env:
+          GITVERSE_RELEASES_TOKEN: ${{ secrets.GITVERSE_RELEASES_TOKEN }}
+          GITVERSE_OWNER: lifesketch
+          GITVERSE_REPO: ffmpeg-stream-rec
+        with:
+          script: |
+            const token = process.env.GITVERSE_RELEASES_TOKEN;
+            const owner = process.env.GITVERSE_OWNER;
+            const repo = process.env.GITVERSE_REPO;
+
+            if (!token) {
+              throw new Error('GITVERSE_RELEASES_TOKEN is not configured');
+            }
+
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+
+            core.info(`Found ${releases.length} GitHub releases`);
+
+            for (const release of releases.reverse()) {
+              const tag = release.tag_name;
+              core.info(`Processing release ${tag}`);
+
+              const existing = await fetch(`https://gitverse.ru/api/v1/repos/${owner}/${repo}/releases/tags/${encodeURIComponent(tag)}`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  Accept: 'application/json',
+                },
+              });
+
+              if (existing.status === 200) {
+                core.info(`Release already exists in GitVerse: ${tag}`);
+                continue;
+              }
+
+              const response = await fetch(`https://gitverse.ru/api/v1/repos/${owner}/${repo}/releases`, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                  Accept: 'application/json',
+                },
+                body: JSON.stringify({
+                  tag_name: release.tag_name,
+                  name: release.name || release.tag_name,
+                  body: release.body || '',
+                  prerelease: Boolean(release.prerelease),
+                  draft: Boolean(release.draft),
+                }),
+              });
+
+              if (!response.ok) {
+                const text = await response.text();
+                throw new Error(`Failed to create GitVerse release ${tag}: HTTP ${response.status} ${text}`);
+              }
+
+              core.info(`Created GitVerse release: ${tag}`);
+            }
