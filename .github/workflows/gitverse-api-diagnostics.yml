@@ -1,0 +1,38 @@
+name: GitVerse API Diagnostics
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Show runner public IP
+        run: |
+          curl -s https://api.ipify.org
+          echo
+
+      - name: Check GitVerse releases API without auth
+        run: |
+          curl -i \
+            -H "Accept: application/json" \
+            https://gitverse.ru/api/v1/repos/lifesketch/ffmpeg-stream-rec/releases || true
+
+      - name: Check GitVerse releases API with PRIVATE-TOKEN
+        env:
+          GITVERSE_TOKEN: ${{ secrets.GITVERSE_RELEASES_TOKEN }}
+        run: |
+          curl -i \
+            -H "PRIVATE-TOKEN: ${GITVERSE_TOKEN}" \
+            -H "Accept: application/json" \
+            https://gitverse.ru/api/v1/repos/lifesketch/ffmpeg-stream-rec/releases || true
+
+      - name: Check GitVerse releases API with Bearer token
+        env:
+          GITVERSE_TOKEN: ${{ secrets.GITVERSE_RELEASES_TOKEN }}
+        run: |
+          curl -i \
+            -H "Authorization: Bearer ${GITVERSE_TOKEN}" \
+            -H "Accept: application/json" \
+            https://gitverse.ru/api/v1/repos/lifesketch/ffmpeg-stream-rec/releases || true
