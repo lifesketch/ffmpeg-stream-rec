@@ -1,0 +1,59 @@
+name: GitVerse Auth Matrix Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  auth-matrix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Test auth schemes against GitVerse API
+        env:
+          GITVERSE_TOKEN: ${{ secrets.GITVERSE_RELEASES_TOKEN }}
+        run: |
+          set +e
+
+          URL="https://api.gitverse.ru/repos/lifesketch/ffmpeg-stream-rec/releases"
+
+          test_case() {
+            NAME="$1"
+            shift
+
+            echo "========================================"
+            echo "TEST: ${NAME}"
+            echo "========================================"
+
+            curl -sS -i \
+              -H "Accept: application/json" \
+              -H "Content-Type: application/json" \
+              -H "User-Agent: Mozilla/5.0" \
+              "$@" \
+              "${URL}" \
+              | sed -n '1,40p'
+
+            echo
+          }
+
+          test_case "No auth"
+
+          test_case "Authorization Bearer" \
+            -H "Authorization: Bearer ${GITVERSE_TOKEN}"
+
+          test_case "Authorization token" \
+            -H "Authorization: token ${GITVERSE_TOKEN}"
+
+          test_case "Authorization raw token" \
+            -H "Authorization: ${GITVERSE_TOKEN}"
+
+          test_case "PRIVATE-TOKEN" \
+            -H "PRIVATE-TOKEN: ${GITVERSE_TOKEN}"
+
+          test_case "X-Auth-Token" \
+            -H "X-Auth-Token: ${GITVERSE_TOKEN}"
+
+          test_case "X-API-Key" \
+            -H "X-API-Key: ${GITVERSE_TOKEN}"
+
+          test_case "Token query parameter" \
+            "${URL}?access_token=${GITVERSE_TOKEN}"
