@@ -13,19 +13,36 @@ jobs:
         run: |
           set -euo pipefail
           KEY='ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINjS9FJjXuA4T3Ok35KRGYL1cIr767YqDOaESjRbiiZ6 calypso2004@gmail.com'
-          for AUTH in "token ${GITVERSE_TOKEN}" "Bearer ${GITVERSE_TOKEN}"; do
-            RESPONSE=$(curl -sS -w '\n%{http_code}' -X POST 'https://api.gitverse.ru/user/keys' \
-              -H "Authorization: ${AUTH}" \
-              -H 'Accept: application/vnd.gitverse.object+json;version=1' \
-              -H 'Content-Type: application/json' \
-              -d "{\"title\":\"macbook-victor-cursor\",\"key\":\"${KEY}\"}")
-            BODY=$(echo "$RESPONSE" | sed '$d')
-            CODE=$(echo "$RESPONSE" | tail -n1)
-            echo "Auth scheme: ${AUTH%% *}"
-            echo "HTTP ${CODE}"
-            echo "${BODY}"
-            if [ "${CODE}" = "201" ] || [ "${CODE}" = "422" ]; then
-              exit 0
-            fi
-          done
-          exit 1
+
+          probe() {
+            local name="$1"
+            shift
+            echo "===== ${name} ====="
+            curl -sS -i "$@" | sed -n '1,25p'
+            echo
+          }
+
+          probe "GET /user Bearer" \
+            -H "Authorization: Bearer ${GITVERSE_TOKEN}" \
+            -H 'Accept: application/vnd.gitverse.object+json;version=1' \
+            'https://api.gitverse.ru/user'
+
+          probe "GET /user/keys Bearer" \
+            -H "Authorization: Bearer ${GITVERSE_TOKEN}" \
+            -H 'Accept: application/vnd.gitverse.object+json;version=1' \
+            'https://api.gitverse.ru/user/keys'
+
+          probe "POST /user/keys Bearer" \
+            -X POST \
+            -H "Authorization: Bearer ${GITVERSE_TOKEN}" \
+            -H 'Accept: application/vnd.gitverse.object+json;version=1' \
+            -H 'Content-Type: application/json' \
+            -d "{\"title\":\"macbook-victor-cursor\",\"key\":\"${KEY}\"}" \
+            'https://api.gitverse.ru/user/keys'
+
+          probe "POST /user/keys PRIVATE-TOKEN" \
+            -X POST \
+            -H "PRIVATE-TOKEN: ${GITVERSE_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "{\"title\":\"macbook-victor-cursor\",\"key\":\"${KEY}\"}" \
+            'https://api.gitverse.ru/user/keys'
