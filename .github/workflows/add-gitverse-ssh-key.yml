@@ -18,31 +18,22 @@ jobs:
             local name="$1"
             shift
             echo "===== ${name} ====="
-            curl -sS -i "$@" | sed -n '1,25p'
+            curl -sS -i "$@" | sed -n '1,30p'
             echo
           }
 
-          probe "GET /user Bearer" \
-            -H "Authorization: Bearer ${GITVERSE_TOKEN}" \
-            -H 'Accept: application/vnd.gitverse.object+json;version=1' \
-            'https://api.gitverse.ru/user'
-
-          probe "GET /user/keys Bearer" \
-            -H "Authorization: Bearer ${GITVERSE_TOKEN}" \
-            -H 'Accept: application/vnd.gitverse.object+json;version=1' \
-            'https://api.gitverse.ru/user/keys'
-
-          probe "POST /user/keys Bearer" \
+          probe "POST deploy key seafteam/seaf-bok Bearer" \
             -X POST \
             -H "Authorization: Bearer ${GITVERSE_TOKEN}" \
             -H 'Accept: application/vnd.gitverse.object+json;version=1' \
             -H 'Content-Type: application/json' \
-            -d "{\"title\":\"macbook-victor-cursor\",\"key\":\"${KEY}\"}" \
-            'https://api.gitverse.ru/user/keys'
+            -d "{\"title\":\"macbook-victor-seaf-bok\",\"key\":\"${KEY}\",\"read_only\":true}" \
+            'https://api.gitverse.ru/repos/seafteam/seaf-bok/keys'
 
-          probe "POST /user/keys PRIVATE-TOKEN" \
+          probe "POST deploy key lifesketch/ffmpeg-stream-rec Bearer" \
             -X POST \
-            -H "PRIVATE-TOKEN: ${GITVERSE_TOKEN}" \
+            -H "Authorization: Bearer ${GITVERSE_TOKEN}" \
+            -H 'Accept: application/vnd.gitverse.object+json;version=1' \
             -H 'Content-Type: application/json' \
-            -d "{\"title\":\"macbook-victor-cursor\",\"key\":\"${KEY}\"}" \
-            'https://api.gitverse.ru/user/keys'
+            -d "{\"title\":\"macbook-victor-ffmpeg\",\"key\":\"${KEY}\",\"read_only\":true}" \
+            'https://api.gitverse.ru/repos/lifesketch/ffmpeg-stream-rec/keys'
